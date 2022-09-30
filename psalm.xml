@@ -1,0 +1,62 @@
+<?xml version="1.0"?>
+<psalm
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns="https://getpsalm.org/schema/config"
+	xsi:schemaLocation="https://getpsalm.org/schema/config vendor/vimeo/psalm/config.xsd"
+	errorLevel="4"
+	reportMixedIssues="false"
+	resolveFromConfigFile="true"
+	autoloader="tests/bootstrap.php"
+	cacheDirectory="tmp/psalm"
+	usePhpDocPropertiesWithoutMagicCall="true"
+>
+	<projectFiles>
+		<directory name="src"/>
+		<ignoreFiles>
+			<directory name="vendor"/>
+		</ignoreFiles>
+	</projectFiles>
+	<issueHandlers>
+		<MissingImmutableAnnotation>
+			<errorLevel type="info">
+				<directory name="src"/>
+			</errorLevel>
+		</MissingImmutableAnnotation>
+		<!-- Enable warnings about deprecations -->
+		<DeprecatedClass>
+			<errorLevel type="error">
+				<directory name="src"/>
+			</errorLevel>
+		</DeprecatedClass>
+		<DeprecatedConstant>
+			<errorLevel type="error">
+				<directory name="src"/>
+			</errorLevel>
+		</DeprecatedConstant>
+		<DeprecatedFunction>
+			<errorLevel type="error">
+				<directory name="src"/>
+			</errorLevel>
+		</DeprecatedFunction>
+		<DeprecatedInterface>
+			<errorLevel type="error">
+				<directory name="src"/>
+			</errorLevel>
+		</DeprecatedInterface>
+		<DeprecatedMethod>
+			<errorLevel type="error">
+				<directory name="src"/>
+			</errorLevel>
+		</DeprecatedMethod>
+		<DeprecatedProperty>
+			<errorLevel type="error">
+				<directory name="src"/>
+			</errorLevel>
+		</DeprecatedProperty>
+		<DeprecatedTrait>
+			<errorLevel type="error">
+				<directory name="src"/>
+			</errorLevel>
+		</DeprecatedTrait>
+	</issueHandlers>
+</psalm>
