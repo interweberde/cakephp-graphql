@@ -9,7 +9,7 @@ use Attribute;
  * @Annotation
  * @Target({"METHOD"})
  * @Attributes({
- *   @Attribute("dependencies", type="array<string|stirng[]>"),
+ *   @Attribute("dependencies", type="array<string|string[]>"),
  *   @Attribute("remapFields", type="string|null"),
  * })
  */
