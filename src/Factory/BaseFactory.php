@@ -13,9 +13,9 @@ class BaseFactory {
 	use LocatorAwareTrait;
 
 	/**
-	 * @var \Cake\ORM\Table|T
+	 * @var T
 	 */
-	protected Table $model;
+	protected $model;
 	public function __construct() {
 		$this->model = $this->fetchTable();
 	}
