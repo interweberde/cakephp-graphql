@@ -23,5 +23,10 @@ The recommended way to install composer packages is:
 composer require interweberde/cakephp-graphql
 ```
 
+## Example App
+An Example CakePHP App using this Plugin can be found here: https://github.com/interweberde/cakephp-graphql-example.
+That Repository contains the exact Backend that was shown in the CakeFest-Talk.
+The Slides for the CakeFest-Talk are available here: https://damn-daniel.de/files/cakefest-2022-slides.pdf
+
 ## Security
 We ask you to report security issues as a `responsible disclosure` via email to security@interweber.de.
