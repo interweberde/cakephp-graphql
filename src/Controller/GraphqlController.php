@@ -8,6 +8,7 @@ use Authorization\Controller\Component\AuthorizationComponent;
 use Cake\Cache\Cache;
 use Cake\Controller\Controller;
 use Cake\Core\Configure;
+use Cake\Core\Plugin;
 use Cake\ORM\Exception\PersistenceFailedException;
 use GraphQL\Error\DebugFlag;
 use GraphQL\Error\Error;
@@ -16,6 +17,7 @@ use Interweber\GraphQL\Classes\AuthorizationService;
 use Interweber\GraphQL\Classes\StaticRequestHandler;
 use Interweber\GraphQL\Exception\ValidationException;
 use Interweber\GraphQL\Mapper\FrozenDateTypeMapperFactory;
+use Mouf\Composer\ClassNameMapper;
 use Psr\Http\Server\MiddlewareInterface;
 use TheCodingMachine\GraphQLite\Exceptions\WebonyxErrorHandler;
 use TheCodingMachine\GraphQLite\Http\Psr15GraphQLMiddlewareBuilder;
@@ -69,7 +71,19 @@ class GraphqlController extends Controller {
 
 		$container = $builder->build();
 
+		$plugin = $this->getPlugin();
+		if (!$plugin) {
+			throw new \RuntimeException('Plugin Controller has no Plugin - something is very wrong!');
+		}
+
+		$pluginPath = Plugin::classPath($plugin);
+		$path = str_replace(ROOT, '', $pluginPath);
+
+		$classNameMapper = ClassNameMapper::createFromComposerFile(null, null, false);
+		$classNameMapper->registerPsr4Namespace('Interweber\\GraphQL', $path);
+
 		$factory = new SchemaFactory($cache, $container);
+		$factory->setClassNameMapper($classNameMapper);
 		$factory
 			->addControllerNamespace(Configure::read('App.namespace') . '\\GraphQL\\Controller')
 			->addTypeNamespace(Configure::read('App.namespace'))
