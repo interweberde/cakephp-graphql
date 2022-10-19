@@ -6,12 +6,35 @@ namespace Interweber\GraphQL\Policy;
 use Cake\ORM\Query;
 use Interweber\GraphQL\Classes\UserInterface;
 
+/**
+ * @template TUser of UserInterface
+ */
 abstract class TablePolicy {
-	abstract public function scopeShow(UserInterface $user, Query $query): Query;
+	/**
+	 * @param TUser $user
+	 * @param Query $query
+	 * @return Query
+	 */
+	abstract public function scopeShow($user, Query $query): Query;
 
-	abstract public function scopeList(UserInterface $user, Query $query): Query;
+	/**
+	 * @param TUser $user
+	 * @param Query $query
+	 * @return Query
+	 */
+	abstract public function scopeList($user, Query $query): Query;
 
-	abstract public function scopeUpdate(UserInterface $user, Query $query): Query;
+	/**
+	 * @param TUser $user
+	 * @param Query $query
+	 * @return Query
+	 */
+	abstract public function scopeUpdate($user, Query $query): Query;
 
-	abstract public function scopeDelete(UserInterface $user, Query $query): Query;
+	/**
+	 * @param TUser $user
+	 * @param Query $query
+	 * @return Query
+	 */
+	abstract public function scopeDelete($user, Query $query): Query;
 }
