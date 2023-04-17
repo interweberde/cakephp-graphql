@@ -9,6 +9,7 @@ use Cake\Cache\Cache;
 use Cake\Controller\Controller;
 use Cake\Core\Configure;
 use Cake\Core\Plugin;
+use Cake\Event\Event;
 use Cake\ORM\Exception\PersistenceFailedException;
 use GraphQL\Error\DebugFlag;
 use GraphQL\Error\Error;
@@ -109,6 +110,8 @@ class GraphqlController extends Controller {
 					->setQueryBatching(true)
 			)
 			->setUrl('/__graphql');
+
+		$this->getEventManager()->dispatch(new Event('onCreateGraphQlBuilder', $this, ['builder' => $builder]));
 
 		$this->graphqlMiddleware = $builder->createMiddleware();
 	}
