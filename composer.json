@@ -14,7 +14,7 @@
         "cakephp/authentication": "^2.9.0",
         "cakephp/authorization": "^2.2.0",
         "thecodingmachine/graphqlite": "^6.0",
-        "php-di/php-di": "^6.4.0"
+        "php-di/php-di": "^7.0.2"
     },
     "require-dev": {
         "cakephp/cakephp-codesniffer": "^4.5.1",

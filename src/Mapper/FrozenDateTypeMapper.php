@@ -8,9 +8,12 @@ use Cake\I18n\FrozenTime;
 use GraphQL\Type\Definition\InputType;
 use GraphQL\Type\Definition\NamedType;
 use GraphQL\Type\Definition\OutputType;
+use GraphQL\Type\Definition\Type as GraphQLType;
 use phpDocumentor\Reflection\DocBlock;
 use phpDocumentor\Reflection\Type;
 use phpDocumentor\Reflection\Types\Object_;
+use ReflectionMethod;
+use ReflectionProperty;
 use TheCodingMachine\GraphQLite\Mappers\Root\RootTypeMapperInterface;
 
 class FrozenDateTypeMapper implements RootTypeMapperInterface {
@@ -30,7 +33,7 @@ class FrozenDateTypeMapper implements RootTypeMapperInterface {
 		?OutputType $subType,
 		$reflector,
 		DocBlock $docBlockObj
-	): OutputType {
+	): OutputType&GraphQLType {
 		$mapped = $this->mapBaseType($type);
 
 		if ($mapped !== null) {
@@ -44,9 +47,9 @@ class FrozenDateTypeMapper implements RootTypeMapperInterface {
 		Type $type,
 		?InputType $subType,
 		string $argumentName,
-		$reflector,
+		ReflectionMethod|ReflectionProperty $reflector,
 		DocBlock $docBlockObj
-	): InputType {
+	): InputType&GraphQLType {
 		$mapped = $this->mapBaseType($type);
 
 		if ($mapped !== null) {
@@ -89,7 +92,7 @@ class FrozenDateTypeMapper implements RootTypeMapperInterface {
 		return self::$dateTimeType;
 	}
 
-	public function mapNameToType(string $typeName): NamedType {
+	public function mapNameToType(string $typeName): NamedType&GraphQLType {
 		if ($typeName === 'FrozenTime') {
 			return self::getDateTimeType();
 		}

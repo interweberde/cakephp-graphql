@@ -10,12 +10,12 @@ class FrozenTimeType extends DateTimeType {
 	/**
 	 * @var string
 	 */
-	public $name = 'FrozenTime';
+	public string $name = 'FrozenTime';
 
 	/**
-	 * @var string
+	 * @var string|null
 	 */
-	public $description = 'The `FrozenTime` scalar type represents time data, represented as an ISO-8601 encoded UTC date string.';
+	public string|null $description = 'The `FrozenTime` scalar type represents time data, represented as an ISO-8601 encoded UTC date string.';
 
 	public function parseValue($value): ?FrozenTime {
 		$date = parent::parseValue($value);
