@@ -139,7 +139,7 @@ class QueryOptimizer {
 							yield $dependencyKey => $value;
 						}
 
-						yield $dependency => array_fill_keys($dependencyValue, true);
+						yield $dependencyKey => array_fill_keys($dependencyValue, true);
 					}
 				}
 			}
