@@ -341,7 +341,14 @@ class QueryOptimizer {
 				}
 
 				if ($item === true) {
-					$result[$realFieldKey]['fields'][] = $fieldKey;
+					if ($fieldKey !== '*') {
+						$result[$realFieldKey]['fields'][] = $fieldKey;
+					}
+
+					$columns = $AssocModel->getSchema()->columns();
+					foreach ($columns as $column) {
+						$result[$realFieldKey]['fields'][] = $column;
+					}
 				}
 			}
 		}
