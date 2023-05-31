@@ -10,6 +10,7 @@ use Cake\ORM\Association\BelongsTo;
 use Cake\ORM\Association\BelongsToMany;
 use Cake\ORM\Association\HasMany;
 use Cake\ORM\Query;
+use Cake\Utility\Hash;
 use Cake\Utility\Inflector;
 use GraphQL\Type\Definition\ResolveInfo;
 use Interweber\GraphQL\Annotation\FieldDependencies;
@@ -111,6 +112,11 @@ class QueryOptimizer {
 
 		$entityReflection = new \ReflectionClass($Model->getEntityClass());
 		foreach ($_fields as $field => $value) {
+			if (is_numeric($field)) {
+				$field = $value;
+				$value = true;
+			}
+
 			if ($field == '__typename') {
 				continue;
 			}
@@ -128,24 +134,50 @@ class QueryOptimizer {
 				if ($dependencyAttribute) {
 					$dependency = new FieldDependencies($dependencyAttribute->getArguments());
 					$remapFields = $dependency->getRemapFields();
-					foreach ($dependency->getDependencies() as $dependencyKey => $dependencyValue) {
+					$dependencies = $dependency->getDependencies();
+					foreach ($dependencies as $dependencyKey => $dependencyValue) {
 						if (is_numeric($dependencyKey)) {
-							yield $dependencyValue => true;
-							continue;
+							if (!is_string($dependencyValue)) {
+								throw new \Exception(
+									sprintf(
+										'malformed dependency in field: %s::%s',
+										$Model->getEntityClass(),
+										$field
+									)
+								);
+							}
+
+							$dependencyKey = $dependencyValue;
+							$dependencyValue = true;
 						}
 
-						if ($remapFields === $dependencyKey) {
+						if ($remapFields === true || $remapFields === $dependencyKey) {
 							$fieldsRemapped = true;
-							yield $dependencyKey => $value;
+							$dependencyValue = $value;
 						}
 
-						yield $dependencyKey => array_fill_keys($dependencyValue, true);
+						if (is_string($dependencyValue) && $dependencyValue !== '*') {
+							$dependencyKey = $dependencyKey . '.' . $dependencyValue;
+							$dependencyValue = true;
+						}
+
+						$nested = Hash::expand([$dependencyKey => $dependencyValue]);
+
+						foreach ($nested as $k => $v) {
+							if (is_array($v)) {
+								yield $k => $v;
+
+								continue;
+							}
+
+							yield $k => true;
+						}
 					}
 				}
 			}
 
 			if ($fieldsRemapped) {
-				return;
+				continue;
 			}
 
 			yield $field => $value;
@@ -299,58 +331,56 @@ class QueryOptimizer {
 	protected static function getContainKeys(\Cake\ORM\Table $Model, array $items, string $key = ''): array {
 		$result = [];
 
-		foreach ($items as $itemKey => $item) {
+		$fields = static::_generateFields($items, $Model);
+
+		foreach ($fields as $itemKey => $item) {
 			if ($itemKey == '__typename') {
 				continue;
 			}
 
-			if (is_array($item)) {
-				$itemKey = Inflector::camelize($itemKey);
+			if ($item === true) {
+				if ($itemKey !== '*') {
+					$result[$key]['fields'][] = $itemKey;
+
+					continue;
+				}
+
+				$columns = $Model->getSchema()->columns();
+				foreach ($columns as $column) {
+					$result[$key]['fields'][] = $column;
+				}
+
+				continue;
+			}
+
+			if (is_string($item)) {
+				$setKey = $key ? $key . '.' . $item : $item;
+				$result[$setKey] = true;
+
+				continue;
+			}
+
+			if (!is_array($item)) {
+				continue;
+			}
+
+			$itemKey = Inflector::camelize($itemKey);
+
+			if (!$Model->hasAssociation($itemKey)) {
+				$itemKey = Inflector::pluralize($itemKey);
 
 				if (!$Model->hasAssociation($itemKey)) {
-					$itemKey = Inflector::pluralize($itemKey);
-
-					if (!$Model->hasAssociation($itemKey)) {
-						continue;
-					}
+					continue;
 				}
 			}
 
-			$fields = static::_generateFields(is_array($item) ? [$itemKey => $item] : [
-				(is_numeric($itemKey) ? (int) $item : $itemKey) => true,
-			], $Model);
-
-			foreach ($fields as $fieldKey => $field) {
-				if ($field === true) {
-					$realFieldKey = $key;
-					$AssocModel = $Model;
-				} else {
-					$realFieldKey = $key ? $key . '.' . $fieldKey : $fieldKey;
-					$AssocModel = $Model->getAssociation($fieldKey)->getTarget();
-				}
-
-				if (is_array($field)) {
-					$result = array_merge($result, QueryOptimizer::getContainKeys($AssocModel, $field, $realFieldKey));
-					continue;
-				}
-
-				if (is_string($item)) {
-					$setKey = $realFieldKey ? $realFieldKey . '.' . $item : $item;
-					$result[$setKey] = true;
-					continue;
-				}
-
-				if ($item === true) {
-					if ($fieldKey !== '*') {
-						$result[$realFieldKey]['fields'][] = $fieldKey;
-					}
-
-					$columns = $AssocModel->getSchema()->columns();
-					foreach ($columns as $column) {
-						$result[$realFieldKey]['fields'][] = $column;
-					}
-				}
-			}
+			$result = array_merge($result, QueryOptimizer::getContainKeys(
+				$Model->getAssociation($itemKey)->getTarget(),
+				$item,
+				$key
+					? $key . '.' . $itemKey
+					: $itemKey
+			));
 		}
 
 		return $result;

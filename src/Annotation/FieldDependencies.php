@@ -9,7 +9,7 @@ use Attribute;
  * @Annotation
  * @Target({"METHOD"})
  * @Attributes({
- *   @Attribute("dependencies", type="array<string|string[]>"),
+ *   @Attribute("dependencies", type="array<int, string>|array<string, array<int, string>>"),
  *   @Attribute("remapFields", type="string|null"),
  * })
  */
@@ -20,26 +20,26 @@ class FieldDependencies {
 	 */
 	protected array $dependencies;
 
-	protected ?string $remapFields;
+	protected string|bool|null $remapFields;
 
 	/**
 	 * @param array $attributes
 	 * @param array<string|string[]> $dependencies
-	 * @param string|null $remapFields
+	 * @param string|bool|null $remapFields
 	 */
-	public function __construct(array $attributes = [], ?array $dependencies = null, ?string $remapFields = null) {
+	public function __construct(array $attributes = [], ?array $dependencies = null, string|bool|null $remapFields = null) {
 		$this->dependencies = $dependencies ?? $attributes['dependencies'] ?? [];
 		$this->remapFields = $remapFields ?? $attributes['remapFields'] ?? null;
 	}
 
 	/**
-	 * @return array<string|string[]>
+	 * @return array<int, string>|array<string, array<int, string>>
 	 */
 	public function getDependencies(): array {
 		return $this->dependencies;
 	}
 
-	public function getRemapFields(): ?string {
+	public function getRemapFields(): string|bool|null {
 		return $this->remapFields;
 	}
 }
