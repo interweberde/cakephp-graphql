@@ -50,6 +50,15 @@ class GraphqlController extends Controller {
 
 		$myErrorHandler = function (array $errors, callable $formatter) {
 			$errors = array_map(function (\Throwable $error) {
+				$event = $this->getEventManager()->dispatch(
+					new Event('onGraphqlError', $this, ['error' => $error])
+				);
+
+				$res = $event->getResult();
+				if ($res instanceof \Throwable) {
+					return $res;
+				}
+
 				/** @var \Throwable|null $prev */
 				$prev = $error->getPrevious();
 
