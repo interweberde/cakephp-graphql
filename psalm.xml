@@ -9,6 +9,8 @@
 	autoloader="tests/bootstrap.php"
 	cacheDirectory="tmp/psalm"
 	usePhpDocPropertiesWithoutMagicCall="true"
+	findUnusedBaselineEntry="true"
+	findUnusedCode="false"
 >
 	<projectFiles>
 		<directory name="src"/>

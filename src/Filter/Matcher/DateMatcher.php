@@ -66,12 +66,16 @@ class DateMatcher extends BaseMatcher {
 			$expr = $expr->lt($field, $this->lt);
 		}
 
-		if ($this->gte) {
+		if ($this->gt) {
 			$expr = $expr->gt($field, $this->gt);
 		}
 
 		if ($this->null) {
 			$expr = $expr->isNull($field);
+		}
+
+		if ($this->null === false) {
+			$expr = $expr->isNotNull($field);
 		}
 
 		return $expr;

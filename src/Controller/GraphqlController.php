@@ -5,24 +5,20 @@ namespace Interweber\GraphQL\Controller;
 
 use Authentication\Controller\Component\AuthenticationComponent;
 use Authorization\Controller\Component\AuthorizationComponent;
-use Cake\Cache\Cache;
 use Cake\Controller\Controller;
 use Cake\Core\Configure;
-use Cake\Core\Plugin;
+use Cake\Datasource\Exception\RecordNotFoundException;
 use Cake\Event\Event;
 use Cake\ORM\Exception\PersistenceFailedException;
 use GraphQL\Error\DebugFlag;
 use GraphQL\Error\Error;
-use Interweber\GraphQL\Classes\AuthenticationService;
-use Interweber\GraphQL\Classes\AuthorizationService;
+use Interweber\GraphQL\Classes\SchemaGenerator;
 use Interweber\GraphQL\Classes\StaticRequestHandler;
 use Interweber\GraphQL\Exception\ValidationException;
-use Interweber\GraphQL\Mapper\FrozenDateTypeMapperFactory;
-use Mouf\Composer\ClassNameMapper;
 use Psr\Http\Server\MiddlewareInterface;
 use TheCodingMachine\GraphQLite\Exceptions\WebonyxErrorHandler;
 use TheCodingMachine\GraphQLite\Http\Psr15GraphQLMiddlewareBuilder;
-use TheCodingMachine\GraphQLite\SchemaFactory;
+use TheCodingMachine\GraphQLite\Schema;
 
 /**
  * @property AuthenticationComponent $Authentication
@@ -36,6 +32,8 @@ class GraphqlController extends Controller {
 	 */
 	protected MiddlewareInterface $graphqlMiddleware;
 
+	protected Schema $schema;
+
 	public function initialize(): void {
 		parent::initialize();
 
@@ -46,8 +44,11 @@ class GraphqlController extends Controller {
 		$this->RequestHandler->renderAs($this, 'json');
 		$this->RequestHandler->respondAs('json');
 
-		$cache = Cache::pool('graphql');
-
+		/**
+		 * @param Error[] $errors
+		 * @param callable(\Throwable): array{ message: string, locations?: array<int, array{line: int, column: int}>, path?: array<int, int|string>, extensions?: array<string, mixed> } $formatter
+		 * @return array<array{ message: string, locations?: array<int, array{line: int, column: int}>, path?: array<int, int|string>, extensions?: array<string, mixed> }>
+		 */
 		$myErrorHandler = function (array $errors, callable $formatter) {
 			$errors = array_map(function (\Throwable $error) {
 				$event = $this->getEventManager()->dispatch(
@@ -68,56 +69,49 @@ class GraphqlController extends Controller {
 					return new Error(message: $aggregate->getMessage(), previous: $aggregate);
 				}
 
+				if ($prev instanceof RecordNotFoundException) {
+					if ($error instanceof Error) {
+						$err = new \Interweber\GraphQL\Exception\RecordNotFoundException(
+							'Record not found',
+							$error->nodes,
+							$error->getSource(),
+							$error->getPositions(),
+							$error->path,
+							null,
+							$error->getExtensions()
+						);
+					} else {
+						$err = new \Interweber\GraphQL\Exception\RecordNotFoundException();
+					}
+
+					return $err;
+				}
+
 				return $error;
 			}, $errors);
 
 			return WebonyxErrorHandler::errorHandler($errors, $formatter);
 		};
 
-		$builder = new \DI\ContainerBuilder();
-		if (!Configure::read('debug')) {
-			$builder->enableDefinitionCache();
-		}
-
-		$container = $builder->build();
-
-		$plugin = $this->getPlugin();
-		if (!$plugin) {
-			throw new \RuntimeException('Plugin Controller has no Plugin - something is very wrong!');
-		}
-
-		$pluginPath = Plugin::classPath($plugin);
-		$path = str_replace(ROOT, '', $pluginPath);
-
-		$classNameMapper = ClassNameMapper::createFromComposerFile(null, null, false);
-		$classNameMapper->registerPsr4Namespace('Interweber\\GraphQL', $path);
-
-		$factory = new SchemaFactory($cache, $container);
-		$factory->setClassNameMapper($classNameMapper);
-		$factory
-			->addControllerNamespace(Configure::read('App.namespace') . '\\GraphQL\\Controller')
-			->addTypeNamespace(Configure::read('App.namespace'))
-			->addTypeNamespace('Interweber\\GraphQL')
-			->addRootTypeMapperFactory(new FrozenDateTypeMapperFactory());
-
-		if (!Configure::read('debug')) {
-			$factory->prodMode();
-		}
-
-		$schema = $factory
-			->setAuthenticationService(new AuthenticationService())
-			->setAuthorizationService(new AuthorizationService())
-			->createSchema();
+		$schema = SchemaGenerator::generateSchema();
 
 		$builder = new Psr15GraphQLMiddlewareBuilder($schema);
-		$builder
-			->setConfig(
-				$builder
-					->getConfig()
-					->setErrorsHandler($myErrorHandler)
-					->setDebugFlag(Configure::read('debug') ? DebugFlag::RETHROW_UNSAFE_EXCEPTIONS : DebugFlag::NONE)
-					->setQueryBatching(true)
+
+		$config = $builder->getConfig();
+
+		// psalm does not play nicely with phpstan-types used there
+		/** @psalm-suppress InvalidArgument */
+		$config->setErrorsHandler($myErrorHandler);
+
+		$config
+			->setDebugFlag(
+				Configure::read('debug')
+					? DebugFlag::RETHROW_UNSAFE_EXCEPTIONS
+					: DebugFlag::NONE
 			)
+			->setQueryBatching(true);
+
+		$builder
 			->setUrl('/__graphql');
 
 		$this->getEventManager()->dispatch(new Event('onCreateGraphQlBuilder', $this, ['builder' => $builder]));
@@ -130,11 +124,14 @@ class GraphqlController extends Controller {
 
 		$request = $this->getRequest();
 
-		$length = (int) ($request->getHeader('content-length')[0] ?? 0);
 		$bodySize = $request->getBody()->getSize();
 
-		if ($bodySize === 0 || $length == 0 || ($bodySize == null && strlen($request->getBody()->getContents()) == 0)) {
+		if ($bodySize === 0 || ($bodySize == null && strlen($request->getBody()->getContents()) == 0)) {
 			return $this->getResponse()->withStatus(400);
+		}
+
+		if (!$request->contentType()) {
+			$request = $request->withHeader('Content-Type', 'application/json');
 		}
 
 		$handler = new StaticRequestHandler($this->getResponse());

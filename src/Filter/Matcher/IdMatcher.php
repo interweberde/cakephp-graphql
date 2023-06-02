@@ -29,8 +29,20 @@ class IdMatcher extends Matcher {
 	}
 
 	public function buildRelation(string $relation, string $field): \Closure {
-		return fn (Query $query, QueryExpression $exp) => $query
-			->leftJoinWith($relation)
-			->where($this->build($query, $query->getRepository()->getAssociation($relation)->aliasField($field)));
+		return function (Query $query, QueryExpression $exp) use ($relation, $field) {
+			$pk = $query->getRepository()->aliasField($query->getRepository()->getPrimaryKey());
+
+			return $query
+				->where($exp->in(
+					$pk,
+					$query->getRepository()->find()
+						->select($pk)
+						->leftJoinWith($relation)
+						->where($this->build(
+							$query,
+							$query->getRepository()->getAssociation($relation)->aliasField($field)
+						))
+				));
+		};
 	}
 }

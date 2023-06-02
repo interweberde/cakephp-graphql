@@ -65,7 +65,7 @@ class FloatMatcher extends BaseMatcher {
 			$expr = $expr->lt($field, $this->lt);
 		}
 
-		if ($this->gte) {
+		if ($this->gt) {
 			$expr = $expr->gt($field, $this->gt);
 		}
 

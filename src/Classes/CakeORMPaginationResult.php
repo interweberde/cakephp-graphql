@@ -101,10 +101,11 @@ class CakeORMPaginationResult implements PaginationResult {
 	 */
 	#[\ReturnTypeWillChange]
 	public function getIterator() {
+		$res = $this->query->all();
 		if ($this->mapResult) {
-			return $this->query->map($this->mapResult);
+			return $res->map($this->mapResult);
 		}
 
-		return $this->query->getIterator();
+		return $res;
 	}
 }

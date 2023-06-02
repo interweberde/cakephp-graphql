@@ -1,0 +1,53 @@
+{
+	"name": "interweberde/cakephp-graphql-test-app",
+	"description": "Test App for GraphQL plugin for CakePHP",
+	"type": "project",
+	"homepage": "https://interweber.de",
+	"require": {
+		"cakephp/cakephp": "^4.0",
+		"cakephp/migrations": "^3.2",
+		"cakephp/bake": "^2.9.3",
+		"interweberde/cakephp-graphql": "@dev"
+	},
+	"require-dev": {
+		"jetbrains/phpstorm-attributes": "^1.0",
+		"phpunit/phpunit": "^9.5.20"
+	},
+	"license": "MIT",
+	"autoload": {
+		"psr-4": {
+			"TestApp\\": "src"
+		}
+	},
+	"autoload-dev": {
+		"psr-4": {
+			"TestApp\\Test\\": "tests",
+			"Cake\\Test\\": "vendor/cakephp/cakephp/tests/"
+		}
+	},
+	"authors": [
+		{
+			"name": "Daniel Melchior",
+			"email": "daniel.melchior@interweber.de"
+		}
+	],
+	"support": {
+		"issues": "https://github.com/interweberde/cakephp-graphql/issues",
+		"source": "https://github.com/interweberde/cakephp-graphql"
+	},
+	"config": {
+		"sort-packages": true,
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		}
+	},
+	"repositories": [
+		{
+			"type": "path",
+			"url": "../",
+			"options": {
+				"symlink": true
+			}
+		}
+	]
+}

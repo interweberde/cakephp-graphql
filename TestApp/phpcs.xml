@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<ruleset name="Interweber">
+	<description>Coding standard based on CakePHP, but allowing Braces on the same Line.</description>
+
+	<arg name="extensions" value="php"/>
+	<!-- Include the whole CakePHP standard -->
+	<rule ref="vendor/interweberde/interweber-cs/Interweber/ruleset.xml">
+		<!-- this rule breaks psalm template-types - therefore disabling it. -->
+		<exclude name="SlevomatCodingStandard.Namespaces.FullyQualifiedClassNameInAnnotation"/>
+		<exclude name="Generic.WhiteSpace.DisallowTabIndent.TabsUsed"/>
+	</rule>
+	<rule ref="vendor/sirbrillig/phpcs-variable-analysis/VariableAnalysis/ruleset.xml"/>
+	<rule ref="SlevomatCodingStandard.Namespaces.UnusedUses">
+		<properties>
+			<property name="searchAnnotations" value="true"/>
+		</properties>
+	</rule>
+	<rule ref="Generic.WhiteSpace.DisallowSpaceIndent.SpacesUsed"/>
+</ruleset>
