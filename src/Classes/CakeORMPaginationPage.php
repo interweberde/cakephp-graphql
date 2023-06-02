@@ -75,7 +75,7 @@ class CakeORMPaginationPage implements PaginationPage {
 	/**
 	 * @inheritDoc
 	 */
-	public function count() {
+	public function count(): int {
 		return $this->resultSet->count();
 	}
 
@@ -92,7 +92,7 @@ class CakeORMPaginationPage implements PaginationPage {
 	 * @return \Iterator
 	 * @psalm-return \Iterator<array-key, T>
 	 */
-	public function getIterator() {
+	public function getIterator(): \Iterator {
 		return $this->resultSet;
 	}
 }

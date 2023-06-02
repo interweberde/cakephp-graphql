@@ -12,8 +12,8 @@ class StringMatcher extends BaseMatcher {
 	private function __construct(
 		?string $eq,
 		?string $neq,
-		?string $in,
-		?string $nin,
+		?array $in,
+		?array $nin,
 		protected ?string $startsWith,
 		protected ?string $endsWith,
 		protected ?string $contains,
@@ -26,8 +26,8 @@ class StringMatcher extends BaseMatcher {
 	 * @Factory()
 	 * @param string|null $eq Match if Entry equals string
 	 * @param string|null $neq Match if Entry does not equal string
-	 * @param string|null $in Match if Entry is in list
-	 * @param string|null $nin Match if Entry is not in list
+	 * @param string[]|null $in Match if Entry is in list
+	 * @param string[]|null $nin Match if Entry is not in list
 	 * @param string|null $startsWith Match if Entry starts with string
 	 * @param string|null $endsWith Match if Entry ends with string
 	 * @param string|null $contains Match if Entry contains string
@@ -37,8 +37,8 @@ class StringMatcher extends BaseMatcher {
 	public static function factory(
 		?string $eq,
 		?string $neq,
-		?string $in,
-		?string $nin,
+		?array $in,
+		?array $nin,
 		?string $startsWith,
 		?string $endsWith,
 		?string $contains,

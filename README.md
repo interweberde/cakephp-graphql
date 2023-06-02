@@ -28,5 +28,9 @@ An Example CakePHP App using this Plugin can be found here: https://github.com/i
 That Repository contains the exact Backend that was shown in the CakeFest-Talk.
 The Slides for the CakeFest-Talk are available here: https://damn-daniel.de/files/cakefest-2022-slides.pdf
 
+## Testing
+Tests are run in a Test App located under `TestApp/`. To run tests successfully, run `composer install` in that directory.
+You can then run tests from the root directory of this repository with `composer run test`.
+
 ## Security
 We ask you to report security issues as a `responsible disclosure` via email to security@interweber.de.

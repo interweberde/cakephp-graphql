@@ -1,0 +1,173 @@
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+type Baz {
+  id: ID!
+  title: String!
+  foo: Foo!
+  bars: [Bar!]!
+}
+
+"The `FrozenDate` scalar type represents time data, represented as an ISO-8601 encoded UTC date string."
+scalar FrozenDate
+
+"The `FrozenTime` scalar type represents time data, represented as an ISO-8601 encoded UTC date string."
+scalar FrozenTime
+
+type BarsBaz {
+  id: ID!
+  title: String!
+  bar: Bar!
+  baz: Baz!
+}
+
+type Qux {
+  id: ID!
+  title: String!
+  bar: Bar!
+}
+
+type Foo {
+  depSimple: String
+  depField: String!
+  depFieldForce: Boolean!
+  depFieldSelect: String!
+  depFieldAsterisk: String!
+  depFieldRemap: [Qux!]!
+  id: ID!
+  bool: Boolean
+  float: Float
+  int: Int
+  str: String
+  date: FrozenDate
+  datetime: FrozenTime
+  bazs: [Baz!]!
+}
+
+type Bar {
+  id: ID!
+  title: String!
+  quxs: [Qux!]!
+  bazs: [Baz!]!
+}
+
+type Query {
+  foo(id: ID!): Foo!
+  foos(filter: FoosFilterInput = null, sorter: FoosSorterInput = null): PorpaginasResult_Foo!
+  baz(id: ID!): Baz!
+  whoami: ID!
+}
+
+input FoosFilterInput {
+  id: IdMatcherInput = null
+  bool: BooleanMatcherInput = null
+  date: DateMatcherInput = null
+  datetime: DateMatcherInput = null
+  float: FloatMatcherInput = null
+  int: IntMatcherInput = null
+  str: StringMatcherInput = null
+  baz_id: IdMatcherInput = null
+}
+
+input IdMatcherInput {
+  id: ID!
+}
+
+input BooleanMatcherInput {
+  eq: Boolean!
+}
+
+input DateMatcherInput {
+  eq: DateTime = null
+  neq: DateTime = null
+  in: [DateTime!] = null
+  nin: [DateTime!] = null
+  lte: DateTime = null
+  gte: DateTime = null
+  lt: DateTime = null
+  gt: DateTime = null
+  null: Boolean = null
+}
+
+"The `DateTime` scalar type represents time data, represented as an ISO-8601 encoded UTC date string."
+scalar DateTime
+
+input FloatMatcherInput {
+  eq: Float = null
+  neq: Float = null
+  in: [Float!] = null
+  nin: [Float!] = null
+  lte: Float = null
+  gte: Float = null
+  lt: Float = null
+  gt: Float = null
+  null: Boolean = null
+}
+
+input IntMatcherInput {
+  eq: Int = null
+  neq: Int = null
+  in: [Int!] = null
+  nin: [Int!] = null
+  lte: Int = null
+  gte: Int = null
+  lt: Int = null
+  gt: Int = null
+  null: Boolean = null
+}
+
+input StringMatcherInput {
+  eq: String = null
+  neq: String = null
+  in: [String!] = null
+  nin: [String!] = null
+  startsWith: String = null
+  endsWith: String = null
+  contains: String = null
+  null: Boolean = null
+}
+
+input FoosSorterInput {
+  fields: [FooSorterFields!]!
+}
+
+enum FooSorterFields {
+  DATE_ASC
+  DATE_DESC
+  ID_ASC
+  ID_DESC
+}
+
+type PorpaginasResult_Foo {
+  items(limit: Int, offset: Int): [Foo!]!
+
+  "The total count of items."
+  count: Int
+}
+
+type Mutation {
+  createFoo(foo: CreateFoo): Foo!
+  updateFoo(foo: UpdateFoo): Foo!
+  deleteFoo(id: ID!): Boolean!
+}
+
+input CreateFoo {
+  bool: Boolean = null
+  date: FrozenDate = null
+  datetime: FrozenTime = null
+  float: Float = null
+  int: Int = null
+  str: String = null
+}
+
+input UpdateFoo {
+  id: ID!
+  bool: Boolean = null
+  date: FrozenDate = null
+  datetime: FrozenTime = null
+  float: Float = null
+  int: Int = null
+  str: String = null
+}
