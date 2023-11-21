@@ -101,13 +101,14 @@ class QueryOptimizer {
 	}
 
 	protected static function _generateFields(array $_fields, \Cake\ORM\Table $Model) {
+		$results = [];
 		$forceFields = $Model->forceFields ?? [];
 		foreach ($forceFields as $forceField) {
 			if ($_fields[$forceField] ?? false) {
 				continue;
 			}
 
-			yield $forceField => true;
+			$results[$forceField] = true;
 		}
 
 		$entityReflection = new \ReflectionClass($Model->getEntityClass());
@@ -165,12 +166,12 @@ class QueryOptimizer {
 
 						foreach ($nested as $k => $v) {
 							if (is_array($v)) {
-								yield $k => $v;
+								$results[$k] = array_merge($results[$k] ?? [], $v);
 
 								continue;
 							}
 
-							yield $k => true;
+							$results[$k] = true;
 						}
 					}
 				}
@@ -180,8 +181,10 @@ class QueryOptimizer {
 				continue;
 			}
 
-			yield $field => $value;
+			$results[$field] = $value;
 		}
+
+		return $results;
 	}
 
 	public static function getRequestedQueryFields(ResolveInfo $info, Query $query, IdentityInterface $user, string $authorizationScope, bool $pagination = false): array {
@@ -338,7 +341,7 @@ class QueryOptimizer {
 				continue;
 			}
 
-			if ($item === true) {
+			if ($key && $item === true) {
 				if ($itemKey !== '*') {
 					$result[$key]['fields'][] = $itemKey;
 
