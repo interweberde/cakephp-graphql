@@ -23,7 +23,7 @@ class SchemaGenerator {
 		$container = $builder->build();
 
 		$pluginPath = Plugin::classPath('Interweber/GraphQL');
-		$path = str_replace(ROOT, '', $pluginPath);
+		$path = str_replace(ROOT . DS, '', $pluginPath);
 
 		$classNameMapper = ClassNameMapper::createFromComposerFile(null, null, false);
 		$classNameMapper->registerPsr4Namespace('Interweber\\GraphQL', $path);
