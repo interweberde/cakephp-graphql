@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Interweber\GraphQL\Policy;
 
-use Cake\ORM\Query;
+use Cake\ORM\Query\SelectQuery;
 use Interweber\GraphQL\Classes\UserInterface;
 
 /**
@@ -11,30 +11,30 @@ use Interweber\GraphQL\Classes\UserInterface;
  */
 abstract class TablePolicy {
 	/**
-	 * @param TUser $user
-	 * @param Query $query
-	 * @return Query
+	 * @param TUser|null $user
+	 * @param SelectQuery $query
+	 * @return SelectQuery
 	 */
-	abstract public function scopeShow($user, Query $query): Query;
+	abstract public function scopeShow($user, SelectQuery $query): SelectQuery;
 
 	/**
-	 * @param TUser $user
-	 * @param Query $query
-	 * @return Query
+	 * @param TUser|null $user
+	 * @param SelectQuery $query
+	 * @return SelectQuery
 	 */
-	abstract public function scopeList($user, Query $query): Query;
+	abstract public function scopeList($user, SelectQuery $query): SelectQuery;
 
 	/**
-	 * @param TUser $user
-	 * @param Query $query
-	 * @return Query
+	 * @param TUser|null $user
+	 * @param SelectQuery $query
+	 * @return SelectQuery
 	 */
-	abstract public function scopeUpdate($user, Query $query): Query;
+	abstract public function scopeUpdate($user, SelectQuery $query): SelectQuery;
 
 	/**
-	 * @param TUser $user
-	 * @param Query $query
-	 * @return Query
+	 * @param TUser|null $user
+	 * @param SelectQuery $query
+	 * @return SelectQuery
 	 */
-	abstract public function scopeDelete($user, Query $query): Query;
+	abstract public function scopeDelete($user, SelectQuery $query): SelectQuery;
 }
