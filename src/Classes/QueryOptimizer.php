@@ -3,13 +3,14 @@ declare(strict_types=1);
 
 namespace Interweber\GraphQL\Classes;
 
+use Authorization\AuthorizationServiceInterface;
 use Authorization\IdentityInterface;
 use Cake\Datasource\EntityInterface;
 use Cake\Datasource\FactoryLocator;
 use Cake\ORM\Association\BelongsTo;
 use Cake\ORM\Association\BelongsToMany;
 use Cake\ORM\Association\HasMany;
-use Cake\ORM\Query;
+use Cake\ORM\Query\SelectQuery;
 use Cake\Utility\Hash;
 use Cake\Utility\Inflector;
 use GraphQL\Type\Definition\ResolveInfo;
@@ -22,18 +23,18 @@ use Interweber\GraphQL\Annotation\FieldDependencies;
 // may fix or ease one case, but break 5 others.
 // That being said: Happy hacking!
 class QueryOptimizer {
-	public static function optimizeQuery(Query $query, ResolveInfo $info, IdentityInterface $user, string $authorizationScope, bool $pagination = false): Query {
+	public static function optimizeQuery(SelectQuery $query, ResolveInfo $info, AuthorizationServiceInterface $authorizationService, ?IdentityInterface $user, string $authorizationScope, bool $pagination = false): SelectQuery {
 		[
 			'select' => $select,
 			'contain' => $contain,
-		] = QueryOptimizer::getRequestedQueryFields($info, $query, $user, $authorizationScope, $pagination);
+		] = QueryOptimizer::getRequestedQueryFields($info, $query, $authorizationService, $user, $authorizationScope, $pagination);
 
 		$query = $query
 			->select($select)
 			->enableAutoFields()
 			->contain($contain);
 
-		return $user->applyScope($authorizationScope, $query);
+		return $authorizationService->applyScope($user, $authorizationScope, $query);
 	}
 
 	/**
@@ -184,7 +185,7 @@ class QueryOptimizer {
 		}
 	}
 
-	public static function getRequestedQueryFields(ResolveInfo $info, Query $query, IdentityInterface $user, string $authorizationScope, bool $pagination = false): array {
+	public static function getRequestedQueryFields(ResolveInfo $info, SelectQuery $query, AuthorizationServiceInterface $authorizationService, ?IdentityInterface $user, string $authorizationScope, bool $pagination = false): array {
 		$_fields = $info->getFieldSelection(6);
 
 		$select = [
@@ -285,9 +286,9 @@ class QueryOptimizer {
 		}
 
 		foreach ($contain as $key => $value) {
-			$contain[$key] = function (Query $q) use ($query, $authorizationScope, $user, $value) {
-				/** @var Query $q */
-				$q = $user->applyScope($authorizationScope, $q);
+			$contain[$key] = function (SelectQuery $q) use ($authorizationService, $query, $authorizationScope, $user, $value) {
+				/** @var SelectQuery $q */
+				$q = $authorizationService->applyScope($user, $authorizationScope, $q);
 
 				$AssocModel = $q->getRepository();
 				$fields = array_filter($value['fields'] ?? [], function ($field) use ($AssocModel) {

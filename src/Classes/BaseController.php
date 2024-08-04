@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Interweber\GraphQL\Classes;
 
+use Authorization\AuthorizationServiceInterface;
 use Cake\Datasource\EntityInterface;
 use Cake\Log\LogTrait;
 use Cake\ORM\Locator\LocatorAwareTrait;
@@ -49,16 +50,19 @@ class BaseController {
 	 * @param UserInterface $user
 	 * @param Filter|null $filter
 	 * @param Sorter|null $sorter
+	 * @param string $scope
 	 * @return CakeORMPaginationResult<E>
 	 */
 	protected function _fetchEntities(
 		ResolveInfo $resolveInfo,
-		UserInterface $user,
+		AuthorizationServiceInterface $authorizationService,
+		?UserInterface $user,
 		?Filter $filter = null,
-		?Sorter $sorter = null
+		?Sorter $sorter = null,
+		string $scope = 'list'
 	): CakeORMPaginationResult {
 		$query = $this->model->find();
-		$query = QueryOptimizer::optimizeQuery($query, $resolveInfo, $user, 'list', true);
+		$query = QueryOptimizer::optimizeQuery($query, $resolveInfo, $authorizationService, $user, $scope, true);
 
 		if ($filter) {
 			$query = $filter->apply($query);
@@ -74,29 +78,39 @@ class BaseController {
 	/**
 	 * @param ResolveInfo $resolveInfo
 	 * @param UserInterface $user
-	 * @param E|EntityInterface $entity
+	 * @param EntityInterface $entity
+	 * @param string $scope
 	 * @return E
 	 * @throws \Exception
 	 */
 	protected function _fetchEntity(
 		ResolveInfo $resolveInfo,
-		UserInterface $user,
-		EntityInterface $entity
+		AuthorizationServiceInterface $authorizationService,
+		?UserInterface $user,
+		EntityInterface $entity,
+		string $scope = 'show'
 	) {
-		return $this->_fetchEntityByPK($resolveInfo, $user, $entity->get($this->model->getPrimaryKey()));
+		if ($entity->get('_locale') && $this->model->hasBehavior('Translate')) {
+			$this->model->setLocale($entity->get('_locale'));
+		}
+
+		return $this->_fetchEntityByPK($resolveInfo, $authorizationService, $user, $entity->get($this->model->getPrimaryKey()), $scope);
 	}
 
 	/**
 	 * @param ResolveInfo $resolveInfo
 	 * @param UserInterface $user
 	 * @param mixed $id
+	 * @param string $scope
 	 * @return E
 	 * @throws \Exception
 	 */
 	protected function _fetchEntityByPK(
 		ResolveInfo $resolveInfo,
-		UserInterface $user,
-		mixed $id
+		AuthorizationServiceInterface $authorizationService,
+		?UserInterface $user,
+		mixed $id,
+		string $scope = 'show'
 	) {
 		$pk = $this->model->getPrimaryKey();
 
@@ -104,37 +118,31 @@ class BaseController {
 			throw new \Exception('empty or composite pks are unsupported.');
 		}
 
-		$query = $this->model->find()->where([
-			$this->model->aliasField($pk) => (string) $id,
-		]);
-
-		$query = QueryOptimizer::optimizeQuery($query, $resolveInfo, $user, 'show');
-
-		/** @var E $entity */
-		$entity = $query->firstOrFail();
-
-		return $entity;
+		return $this->_fetchEntityByField($resolveInfo, $authorizationService, $user, $pk, $id, $scope);
 	}
 
 	/**
 	 * @param ResolveInfo|null $resolveInfo Note: null is only allowed for internal purposes. Be sure to pass ResolveInfo when using result as GraphQL return.
 	 * @param UserInterface $user
 	 * @param string $field
-	 * @param ID $id
+	 * @param ID|string|int $id
+	 * @param string $scope
 	 * @return E
 	 */
 	protected function _fetchEntityByField(
 		?ResolveInfo $resolveInfo,
-		UserInterface $user,
+		AuthorizationServiceInterface $authorizationService,
+		?UserInterface $user,
 		string $field,
-		ID $id
+		ID|string|int $id,
+		string $scope = 'show'
 	) {
 		$query = $this->model->find()->where([
 			$this->model->aliasField($field) => (string) $id,
 		]);
 
 		if ($resolveInfo) {
-			$query = QueryOptimizer::optimizeQuery($query, $resolveInfo, $user, 'show');
+			$query = QueryOptimizer::optimizeQuery($query, $resolveInfo, $authorizationService, $user, $scope);
 		}
 
 		/** @var E $entity */
@@ -152,46 +160,53 @@ class BaseController {
 	 */
 	protected function _createEntity(
 		ResolveInfo $resolveInfo,
-		UserInterface $user,
-		EntityInterface $entity
+		AuthorizationServiceInterface $authorizationService,
+		?UserInterface $user,
+		EntityInterface $entity,
+		string $fetchScope = 'show'
 	) {
-		if (!$user->can('create', $entity)) {
+		if (!$authorizationService->can($user, 'create', $entity)) {
 			throw new ForbiddenException();
 		}
 
 		$this->model->saveOrFail($entity);
 
-		return $this->_fetchEntity($resolveInfo, $user, $entity);
+		return $this->_fetchEntity($resolveInfo, $authorizationService, $user, $entity, $fetchScope);
 	}
 
 	/**
 	 * @param ResolveInfo $resolveInfo
+	 * @param AuthorizationServiceInterface $authorizationService
 	 * @param UserInterface $user
-	 * @param E $entity
+	 * @param EntityInterface $entity
+	 * @param string $fetchScope
 	 * @return E
 	 * @throws ForbiddenException
 	 */
 	protected function _updateEntity(
 		ResolveInfo $resolveInfo,
-		UserInterface $user,
-		EntityInterface $entity
+		AuthorizationServiceInterface $authorizationService,
+		?UserInterface $user,
+		EntityInterface $entity,
+		string $fetchScope = 'show'
 	) {
-		if (!$user->can('update', $entity)) {
+		if (!$authorizationService->can($user, 'update', $entity)) {
 			throw new ForbiddenException();
 		}
 
 		$this->model->saveOrFail($entity);
 
-		return $this->_fetchEntity($resolveInfo, $user, $entity);
+		return $this->_fetchEntity($resolveInfo, $authorizationService, $user, $entity, $fetchScope);
 	}
 
 	protected function _deleteEntity(
-		UserInterface $user,
+		AuthorizationServiceInterface $authorizationService,
+		?UserInterface $user,
 		string $field,
 		ID $id
 	): bool {
-		$entity = $this->_fetchEntityByField(null, $user, $field, $id);
-		if (!$user->can('delete', $entity)) {
+		$entity = $this->_fetchEntityByField(null, $authorizationService, $user, $field, $id);
+		if (!$authorizationService->can($user, 'delete', $entity)) {
 			throw new ForbiddenException();
 		}
 
