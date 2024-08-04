@@ -5,8 +5,6 @@ namespace Interweber\GraphQL\Command\Bake;
 use Bake\Command\SimpleBakeCommand;
 use Cake\Console\Arguments;
 use Cake\Console\ConsoleIo;
-use Cake\Database\Type\EnumType;
-use Cake\Database\TypeFactory;
 use Cake\ORM\Association;
 use Cake\Utility\Inflector;
 
@@ -30,7 +28,7 @@ class GraphqlSorterCommand extends SimpleBakeCommand {
         $contents = $this->createTemplateRenderer()
             ->set('name', $name)
             ->set($this->templateData($args))
-            ->generate('graphqlSorter.php');
+            ->generate('Interweber/GraphQL.graphqlSorter.php');
 
         $filename = $this->getPath($args) . sprintf("%sSorter.php", $name);
         $io->createFile($filename, $contents, $this->force);
@@ -38,7 +36,7 @@ class GraphqlSorterCommand extends SimpleBakeCommand {
 		$contents = $this->createTemplateRenderer()
             ->set('name', $name)
             ->set($this->templateData($args))
-            ->generate('graphqlSorterFields.php');
+            ->generate('Interweber/GraphQL.graphqlSorterFields.php');
 
         $filename = $this->getPath($args) . sprintf("%sSorterFields.php", $name);
         $io->createFile($filename, $contents, $this->force);
@@ -79,7 +77,8 @@ class GraphqlSorterCommand extends SimpleBakeCommand {
 		$assocs = $modelObj->associations();
 
 		$assocKeys = collection($assocs)
-			->map(fn (Association $assoc) => $assoc->getBindingKey())
+			->indexBy(fn (Association $assoc) => $assoc->getName())
+			->map(fn (Association $assoc) => $assoc instanceof Association\HasMany || $assoc instanceof Association\BelongsToMany ? $assoc->getBindingKey() : $assoc->getForeignKey())
 			->filter(fn ($k) => $k !== 'id')
 			->toArray();
 

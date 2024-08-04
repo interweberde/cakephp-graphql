@@ -27,6 +27,8 @@ class {{ pluralName }}Filter extends Filter {
 {% for field in fields %}
 {% if field.type == 'relation' %}
 			'{{ field.name }}' => ${{ field.name }}?->buildRelation('{{ field.relation_name }}', 'uuid'),
+{% elseif field.type == 'primary' and hasUuid %}
+			'uuid' => ${{ field.name }},
 {% else %}
 			'{{ field.name }}' => ${{ field.name }},
 {% endif %}

@@ -3,18 +3,18 @@ declare(strict_types=1);
 
 namespace {{ namespace }}\GraphQL\Controller;
 
-use App\GraphQL\Exception\ForbiddenException;
-use {{ namespace }}\GraphQL\Filter\{{ pluralHumanName }}Filter;
-use {{ namespace }}\GraphQL\Sorter\{{ pluralHumanName }}Sorter;
+use {{ namespace }}\Classes\Enum\Locale;
+use {{ namespace }}\GraphQL\Filter\{{ modelName }}Filter;
+use {{ namespace }}\GraphQL\Sorter\{{ modelName }}Sorter;
 use {{ namespace }}\Model\Entity\User;
-{%- if entityName != 'User' -%}
+{% if entityName != 'User' %}
 use {{ namespace }}\Model\Entity\{{ entityName }};
-{%- endif -%}
+{% endif %}
 use {{ namespace }}\Model\Table\{{ tableName }};
+use Authorization\AuthorizationServiceInterface;
 use GraphQL\Type\Definition\ResolveInfo;
 use Interweber\GraphQL\Classes\BaseController;
 use Interweber\GraphQL\Classes\CakeORMPaginationResult;
-use Interweber\GraphQL\Classes\QueryOptimizer;
 use TheCodingMachine\GraphQLite\Annotations\InjectUser;
 use TheCodingMachine\GraphQLite\Annotations\Mutation;
 use TheCodingMachine\GraphQLite\Annotations\Query;
@@ -24,100 +24,90 @@ use TheCodingMachine\GraphQLite\Types\ID;
 /**
  * @template-extends BaseController<{{ tableName }}, {{ entityName }}>
  */
-class {{ name }}Controller extends BaseController {
+class {{ modelName }}Controller extends BaseController {
 	public string $modelName = {{ tableName }}::class;
 
 	/**
-	 * @param User ${{ identityVariable }}
 	 * @param ResolveInfo $resolveInfo
-	 * @param {{ pluralHumanName }}Filter|null $filter
-	 * @param {{ pluralHumanName }}Sorter|null $sorter
+	 * @param AuthorizationServiceInterface $authorizationService
+	 * @param User $identity
+	 * @param {{ modelName }}Filter|null $filter
+	 * @param {{ modelName }}Sorter|null $sorter
 	 * @return CakeORMPaginationResult|{{ entityName }}[]
 	 * @psalm-return CakeORMPaginationResult<{{ entityName }}>
 	 */
 	#[Query]
-	public function get{{ pluralHumanName }}(
-		#[InjectUser] User ${{ identityVariable }},
+	public function get{{ modelName }}(
 		ResolveInfo $resolveInfo,
-		?{{ pluralHumanName }}Filter $filter,
-		?{{ pluralHumanName }}Sorter $sorter
+		AuthorizationServiceInterface $authorizationService,
+		#[InjectUser]
+		{% if allowUnauthenticatedIndex %}?{% endif %}User $identity,
+		?{{ modelName }}Filter $filter,
+		?{{ modelName }}Sorter $sorter
 	): CakeORMPaginationResult {
-		$query = $this->model->find();
-
-		if ($filter) {
-			$query = $filter->apply($query);
-		}
-
-		if ($sorter) {
-			$query = $sorter->apply($query);
-		}
-
-		$query = QueryOptimizer::optimizeQuery($query, $resolveInfo, ${{ identityVariable }}, 'list', true);
-
-		/** @var \Cake\ORM\Query $query */
-		$query = ${{ identityVariable }}->applyScope('list', $query);
-
-		return new CakeORMPaginationResult($query);
+		return $this->_fetchEntities($resolveInfo, $authorizationService, $identity, $filter, $sorter);
 	}
 
 	#[Query]
-	public function get{{ singularHumanName }}(
+	public function get{{ entityName }}(
+		ResolveInfo $resolveInfo,
+		AuthorizationServiceInterface $authorizationService,
 		#[InjectUser]
-		User ${{ identityVariable }},
-		ID $id
+		{% if allowUnauthenticatedView %}?{% endif %}User $identity,
+		ID $id,
+{% if hasTranslate %}
+		?Locale $locale,
+{% endif %}
 	): {{ entityName }} {
-		/** @var {{ entityName }} $entity */
-		$entity = $this->model->getAuthenticatedByField('uuid', $id, ${{ identityVariable }}, 'show');
-
-		return $entity;
-	}
-
-	#[Mutation]
-	public function create{{ singularHumanName }}(
-		#[InjectUser]
-		User ${{ identityVariable }},
-		#[UseInputType('Create{{ singularHumanName }}Input!')]
-		{{ entityName }} ${{ singularVariable }}
-	): {{ entityName }} {
-		if (!${{ identityVariable }}->can('create', ${{ singularVariable }})) {
-			throw new ForbiddenException();
+{% if hasTranslate %}
+		if ($locale) {
+			$this->model->setLocale($locale->value);
 		}
 
-		$this->model->saveOrFail(${{ singularVariable }});
-
-		return ${{ singularVariable }};
-	}
-
-	#[Mutation]
-	public function update{{ singularHumanName }}(
-		#[InjectUser]
-		User ${{ identityVariable }},
-		#[UseInputType('Update{{ singularHumanName }}Input!')]
-		{{ entityName }} ${{ singularVariable }}
-	): {{ entityName }} {
-		if (!${{ identityVariable }}->can('update', ${{ singularVariable }})) {
-			throw new ForbiddenException();
-		}
-
-		$this->model->saveOrFail(${{ singularVariable }});
-
-		return ${{ singularVariable }};
+{% endif %}
+		return $this->_fetchEntityByField($resolveInfo, $authorizationService, $identity, 'uuid', $id);
 	}
 
 	/**
-	 * @throws ForbiddenException
+	 * @throws \Interweber\GraphQL\Exception\ForbiddenException
 	 */
 	#[Mutation]
-	public function delete{{ singularHumanName }}(
+	public function create{{ entityName }}(
+		ResolveInfo $resolveInfo,
+		AuthorizationServiceInterface $authorizationService,
 		#[InjectUser]
-		User ${{ identityVariable }},
+		{% if allowUnauthenticatedCreate %}?{% endif %}User $identity,
+		#[UseInputType('Create{{ entityName }}Input!')]
+		{{ entityName }} $entity
+	): {{ entityName }} {
+		return $this->_createEntity($resolveInfo, $authorizationService, $identity, $entity);
+	}
+
+	/**
+	 * @throws \Interweber\GraphQL\Exception\ForbiddenException
+	 */
+	#[Mutation]
+	public function update{{ entityName }}(
+		ResolveInfo $resolveInfo,
+		AuthorizationServiceInterface $authorizationService,
+		#[InjectUser]
+		{% if allowUnauthenticatedUpdate %}?{% endif %}User $identity,
+		#[UseInputType('Update{{ entityName }}Input!')]
+		{{ entityName }} $entity
+	): {{ entityName }} {
+		return $this->_updateEntity($resolveInfo, $authorizationService, $identity, $entity);
+	}
+
+	/**
+	 * @throws \Interweber\GraphQL\Exception\ForbiddenException
+	 */
+	#[Mutation]
+	public function delete{{ entityName }}(
+		AuthorizationServiceInterface $authorizationService,
+		#[InjectUser]
+		{% if allowUnauthenticatedDelete %}?{% endif %}User $identity,
 		ID $id
 	): bool {
-		${{ singularVariable }} = $this->model->getAuthenticatedByField('uuid', $id, ${{ identityVariable }}, 'delete');
-		if (!${{ identityVariable }}->can('delete', ${{ singularVariable }})) {
-			throw new ForbiddenException();
-		}
-
-		return $this->model->deleteOrFail(${{ singularVariable }});
+		return $this->_deleteEntity($authorizationService, $identity, 'uuid', $id);
 	}
 }

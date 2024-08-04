@@ -4,9 +4,9 @@ declare(strict_types=1);
 namespace {{ namespace }}\GraphQL\Factory;
 
 use {{ namespace }}\Model\Entity\User;
-{%- if entityName != 'User' -%}
+{% if entityName != 'User' %}
 use {{ namespace }}\Model\Entity\{{ entityName }};
-{%- endif -%}
+{% endif %}
 use {{ namespace }}\Model\Table\{{ tableName }};
 use Interweber\GraphQL\Factory\BaseFactory;
 use TheCodingMachine\GraphQLite\Annotations\Factory;
@@ -24,7 +24,7 @@ class {{ entityName }}Factory extends BaseFactory {
 	#[Factory(name: "Create{{ entityName }}Input", default: true)]
 	public function create(
 		#[InjectUser]
-		User $identity,
+		{% if allowUnauthenticatedCreate %}?{% endif %}User $identity,
 {% for var, property in properties %}
 		{%- if property.type == 'ID' -%}
 			{%- set type = 'ID' -%}
@@ -36,11 +36,26 @@ class {{ entityName }}Factory extends BaseFactory {
 		{%- endif %}
 		{{ type }} ${{ var }},
 {% endfor %}
+{% if hasTranslate %}
+		?string $locale,
+{% endif %}
 	): {{ entityName }} {
+{% if hasTranslate %}
+		if ($locale) {
+			$this->model->setLocale($locale->value);
+		}
+
+{% endif %}
 		return $this->model->newEntity([
 {% for var, property in properties %}
 {% if property.assoc %}
+{% if property.null %}
+			'{{ var }}' => ${{ var }}
+				? $this->model->{{ property.assoc }}->getAuthenticatedByField('uuid', (string) ${{ var }}, $identity, 'show')
+				: null,
+{% else %}
 			'{{ var }}' => $this->model->{{ property.assoc }}->getAuthenticatedByField('uuid', (string) ${{ var }}, $identity, 'show'),
+{% endif %}
 {% else %}
 			'{{ var }}' => ${{ var }},
 {% endif -%}
@@ -51,7 +66,7 @@ class {{ entityName }}Factory extends BaseFactory {
 	#[Factory(name: "Update{{ entityName }}Input", default: false)]
 	public function update(
 		#[InjectUser]
-		User $identity,
+		{% if allowUnauthenticatedUpdate %}?{% endif %}User $identity,
 		ID $id,
 {% for var, property in properties %}
 		{%- if property.type == 'ID' -%}
@@ -64,13 +79,28 @@ class {{ entityName }}Factory extends BaseFactory {
 		{%- endif %}
 		{{ type }} ${{ var }},
 {% endfor %}
+{% if hasTranslate %}
+		?string $locale,
+{% endif %}
 	): {{ entityName }} {
+{% if hasTranslate %}
+		if ($locale) {
+			$this->model->setLocale($locale->value);
+		}
+
+{% endif %}
 		$model = $this->model->getAuthenticatedByField('uuid', (string) $id, $identity, 'show');
 
 		return $this->model->patchEntity($model, [
 {% for var, property in properties %}
 {% if property.assoc %}
+{% if property.null %}
+			'{{ var }}' => ${{ var }}
+				? $this->model->{{ property.assoc }}->getAuthenticatedByField('uuid', (string) ${{ var }}, $identity, 'show')
+				: null,
+{% else %}
 			'{{ var }}' => $this->model->{{ property.assoc }}->getAuthenticatedByField('uuid', (string) ${{ var }}, $identity, 'show'),
+{% endif %}
 {% else %}
 			'{{ var }}' => ${{ var }},
 {% endif -%}

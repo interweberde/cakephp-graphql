@@ -4,11 +4,9 @@ namespace Interweber\GraphQL\Command\Bake;
 
 use Bake\Command\SimpleBakeCommand;
 use Cake\Console\Arguments;
-use Cake\Core\Configure;
-use Cake\Database\Type\EnumType;
-use Cake\Database\TypeFactory;
+use Cake\Console\ConsoleOptionParser;
 use Cake\ORM\Association;
-use Cake\ORM\Association\BelongsTo;
+use Cake\ORM\Behavior\TreeBehavior;
 use Cake\Utility\Inflector;
 
 class GraphqlFactoryCommand extends SimpleBakeCommand {
@@ -23,7 +21,22 @@ class GraphqlFactoryCommand extends SimpleBakeCommand {
 	}
 
 	public function template(): string {
-		return 'graphqlFactory.php';
+		return 'Interweber/GraphQL.graphqlFactory.php';
+	}
+
+	public function buildOptionParser(ConsoleOptionParser $parser): ConsoleOptionParser {
+		$parser = parent::buildOptionParser($parser);
+
+		$parser
+			->addOption('allow_unauthenticated', [
+				'multiple' => true,
+				'choices' => [
+					'create',
+					'update',
+				]
+			]);
+
+		return $parser;
 	}
 
 	public function templateData(Arguments $arguments): array {
@@ -61,19 +74,38 @@ class GraphqlFactoryCommand extends SimpleBakeCommand {
 		$assocs = collection($modelObj->associations());
 
 		$assocKeys = $assocs
-//			->map(fn (Association $assoc) => [
-//				'type' => $assoc::class,
-//				'b' => $assoc->getBindingKey(),
-//				'f' => $assoc->getForeignKey(),
-//			])
 			->indexBy(fn (Association $assoc) => $assoc->getName())
 			->map(fn (Association $assoc) => $assoc instanceof Association\HasMany || $assoc instanceof Association\BelongsToMany ? $assoc->getBindingKey() : $assoc->getForeignKey())
 			->filter(fn ($k) => $k !== 'id')
 			->toArray();
 
+		$skipFields = [
+			$pk,
+			'uuid',
+			'created',
+			'modified',
+			'deleted',
+		];
+
+		if ($modelObj->hasBehavior('Tree')) {
+			$treeBehavior = $modelObj->getBehavior('Tree');
+
+			if ($treeBehavior instanceof TreeBehavior) {
+				$config = $treeBehavior->getConfig();
+
+				$skipFields[] = $config['left'];
+				$skipFields[] = $config['right'];
+
+				$level = $config['level'] ?? null;
+				if ($level) {
+					$skipFields[] = $level;
+				}
+			}
+		}
+
 		$properties = [];
         foreach ($schema->columns() as $column) {
-			if ($column === $pk || $column === 'uuid') {
+			if (in_array($column, $skipFields)) {
 				continue;
 			}
 
@@ -95,33 +127,24 @@ class GraphqlFactoryCommand extends SimpleBakeCommand {
             ];
         }
 
+		$hasTranslate = $modelObj->hasBehavior('Translate');
+
+		$allow = $arguments->getMultipleOption('allow_unauthenticated');
+		$allowUnauthenticatedCreate = $allow && in_array('create', $allow);
+		$allowUnauthenticatedUpdate = $allow && in_array('update', $allow);
+
 		return compact(
 			'namespace',
 			'properties',
+			'hasTranslate',
 			'modelName',
 			'tableName',
 			'entityName',
 			'singularHumanName',
 			'pluralHumanName',
 			'singularVariable',
+			'allowUnauthenticatedCreate',
+			'allowUnauthenticatedUpdate',
 		);
 	}
-
-	public function getEntityPropertySchema(Table $model): array
-    {
-        $properties = [];
-
-        $schema = $model->getSchema();
-        foreach ($schema->columns() as $column) {
-            $columnSchema = $schema->getColumn($column);
-
-            $properties[$column] = [
-                'kind' => 'column',
-                'type' => $columnSchema['type'],
-                'null' => $columnSchema['null'],
-            ];
-        }
-
-        return $properties;
-    }
 }

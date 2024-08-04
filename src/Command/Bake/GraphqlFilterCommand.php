@@ -7,6 +7,8 @@ use Cake\Console\Arguments;
 use Cake\Database\Type\EnumType;
 use Cake\Database\TypeFactory;
 use Cake\ORM\Association;
+use Cake\ORM\Behavior\TranslateBehavior;
+use Cake\ORM\Behavior\TreeBehavior;
 use Cake\Utility\Inflector;
 
 class GraphqlFilterCommand extends SimpleBakeCommand {
@@ -21,7 +23,7 @@ class GraphqlFilterCommand extends SimpleBakeCommand {
 	}
 
 	public function template(): string {
-		return 'graphqlFilter.php';
+		return 'Interweber/GraphQL.graphqlFilter.php';
 	}
 
 	public function templateData(Arguments $arguments): array {
@@ -53,19 +55,55 @@ class GraphqlFilterCommand extends SimpleBakeCommand {
 		$schema = $modelObj->getSchema();
 		$fields = $schema->columns();
 
-		if ($schema->hasColumn('uuid')) {
+		$hasUuid = $pk !== 'uuid' && $schema->hasColumn('uuid');
+		if ($hasUuid) {
 			// we'll use uuid as id.
 			$fields = array_filter($fields, fn($f) => $f !== 'uuid');
 		}
 
 		$assocs = $modelObj->associations();
 
-		$assocKeys = collection($assocs)
-			->map(fn (Association $assoc) => $assoc->getBindingKey())
+		$skipFields = collection($assocs)
+			->indexBy(fn (Association $assoc) => $assoc->getName())
+			->map(fn (Association $assoc) => $assoc instanceof Association\HasMany || $assoc instanceof Association\BelongsToMany ? $assoc->getBindingKey() : $assoc->getForeignKey())
 			->filter(fn ($k) => $k !== 'id')
 			->toArray();
 
-		$fields = array_filter($fields, fn ($field) => !in_array($field, $assocKeys));
+		if ($modelObj->hasBehavior('Tree')) {
+			$treeBehavior = $modelObj->getBehavior('Tree');
+
+			if ($treeBehavior instanceof TreeBehavior) {
+				$config = $treeBehavior->getConfig();
+
+				$skipFields[] = $config['left'];
+				$skipFields[] = $config['right'];
+
+				$level = $config['level'] ?? null;
+				if ($level) {
+					$skipFields[] = $level;
+				}
+
+				$assocs = collection($assocs)->filter(
+					fn (Association $assoc) =>
+						$assoc->getName() !== 'Parent' . $pluralName
+						&& $assoc->getName() !== 'Child' . $pluralName
+				);
+			}
+		}
+
+		if ($modelObj->hasBehavior('Translate')) {
+			$Translate = $modelObj->getBehavior('Translate');
+
+			if ($Translate instanceof TranslateBehavior) {
+				$TranslateAssocAlias = $Translate->getStrategy()->getTranslationTable()->getAlias();
+				$assocs = collection($assocs)->filter(
+					fn (Association $assoc) => $assoc->getName() !== $TranslateAssocAlias
+				);
+
+			}
+		}
+
+		$fields = array_filter($fields, fn ($field) => !in_array($field, $skipFields));
 
 		$fields = array_map(function ($field) use ($pk, $schema) {
 			$info = $schema->getColumn($field);
@@ -93,7 +131,6 @@ class GraphqlFilterCommand extends SimpleBakeCommand {
 			) {
 				$ret['type'] = 'Date';
 			} elseif (str_starts_with($info['type'], 'enum')) {
-				// TODO: add type hint
 				$ret['type'] = 'Enum';
 				/** @var EnumType $type */
 				$type = TypeFactory::build($info['type']);
@@ -123,6 +160,7 @@ class GraphqlFilterCommand extends SimpleBakeCommand {
 			'singularName',
 			'singularHumanName',
 			'pluralHumanName',
+			'hasUuid',
 		);
 	}
 }

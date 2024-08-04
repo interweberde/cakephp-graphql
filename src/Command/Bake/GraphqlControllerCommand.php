@@ -4,9 +4,11 @@ namespace Interweber\GraphQL\Command\Bake;
 
 use Bake\Command\SimpleBakeCommand;
 use Cake\Console\Arguments;
+use Cake\Console\ConsoleOptionParser;
 use Cake\Database\Type\EnumType;
 use Cake\Database\TypeFactory;
 use Cake\ORM\Association;
+use Cake\ORM\TableRegistry;
 use Cake\Utility\Inflector;
 
 class GraphqlControllerCommand extends SimpleBakeCommand {
@@ -21,7 +23,25 @@ class GraphqlControllerCommand extends SimpleBakeCommand {
 	}
 
 	public function template(): string {
-		return 'graphqlController.php';
+		return 'Interweber/GraphQL.graphqlController.php';
+	}
+
+	public function buildOptionParser(ConsoleOptionParser $parser): ConsoleOptionParser {
+		$parser = parent::buildOptionParser($parser);
+
+		$parser
+			->addOption('allow_unauthenticated', [
+				'multiple' => true,
+				'choices' => [
+					'index',
+					'view',
+					'create',
+					'update',
+					'delete',
+				]
+			]);
+
+		return $parser;
 	}
 
 	public function templateData(Arguments $arguments): array {
@@ -30,7 +50,8 @@ class GraphqlControllerCommand extends SimpleBakeCommand {
  		$name = $this->_getName($arguments->getArgumentAt(0));
 		$name = Inflector::camelize($name);
 
-		$tableName = $this->_modelNameFromKey($name) . 'Table';
+		$modelName = $this->_modelNameFromKey($name);
+		$tableName = $modelName . 'Table';
 		$entityName = $this->_entityName($name);
 		$singularHumanName = $this->_singularHumanName($name);
 		$pluralHumanName = $this->_pluralHumanName($name);
@@ -38,14 +59,31 @@ class GraphqlControllerCommand extends SimpleBakeCommand {
 
 		$identityVariable = $singularVariable === 'identity' ? 'authIdentity' : 'identity';
 
+		$model = TableRegistry::getTableLocator()->get($modelName);
+		$hasTranslate = $model->hasBehavior('Translate');
+
+		$allow = $arguments->getMultipleOption('allow_unauthenticated');
+		$allowUnauthenticatedIndex = $allow && in_array('index', $allow);
+		$allowUnauthenticatedView = $allow && in_array('view', $allow);
+		$allowUnauthenticatedCreate = $allow && in_array('create', $allow);
+		$allowUnauthenticatedUpdate = $allow && in_array('update', $allow);
+		$allowUnauthenticatedDelete = $allow && in_array('delete', $allow);
+
 		return compact(
 			'namespace',
+			'modelName',
 			'tableName',
 			'entityName',
 			'singularHumanName',
 			'pluralHumanName',
 			'singularVariable',
 			'identityVariable',
+			'hasTranslate',
+			'allowUnauthenticatedIndex',
+			'allowUnauthenticatedView',
+			'allowUnauthenticatedCreate',
+			'allowUnauthenticatedUpdate',
+			'allowUnauthenticatedDelete',
 		);
 	}
 }
