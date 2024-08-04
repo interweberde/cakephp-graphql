@@ -13,6 +13,8 @@ use Cake\ORM\Exception\PersistenceFailedException;
 use Cake\View\JsonView;
 use GraphQL\Error\DebugFlag;
 use GraphQL\Error\Error;
+use Interweber\GraphQL\Classes\AuthenticationService;
+use Interweber\GraphQL\Classes\AuthorizationService;
 use Interweber\GraphQL\Classes\SchemaGenerator;
 use Interweber\GraphQL\Classes\StaticRequestHandler;
 use Interweber\GraphQL\Exception\ValidationException;
@@ -97,7 +99,13 @@ class GraphqlController extends Controller {
 			return WebonyxErrorHandler::errorHandler($errors, $formatter);
 		};
 
-		$schema = SchemaGenerator::generateSchema();
+		$schemaFactory = SchemaGenerator::getSchemaFactory();
+
+		$schemaFactory
+			->setAuthenticationService(new AuthenticationService($this->request))
+			->setAuthorizationService(new AuthorizationService());
+
+		$schema = $schemaFactory->createSchema();
 
 		$builder = new Psr15GraphQLMiddlewareBuilder($schema);
 

@@ -38,7 +38,7 @@ class PrintSchemaCommand extends Command {
 	 * @return null|void|int The exit code or null for success
 	 */
 	public function execute(Arguments $args, ConsoleIo $io) {
-		$schema = SchemaPrinter::doPrint(SchemaGenerator::generateSchema());
+		$schema = SchemaPrinter::doPrint(SchemaGenerator::getSchemaFactory()->createSchema());
 
 		file_put_contents($args->getArgument('file'), $schema);
 	}

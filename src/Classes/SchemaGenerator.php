@@ -12,7 +12,7 @@ use Kcs\ClassFinder\Finder\ComposerFinder;
 use TheCodingMachine\GraphQLite\SchemaFactory;
 
 class SchemaGenerator {
-	public static function generateSchema() {
+	public static function getSchemaFactory(): SchemaFactory {
 		$cache = Cache::pool('graphql');
 
 		$builder = new \DI\ContainerBuilder();
@@ -43,9 +43,8 @@ class SchemaGenerator {
 			$factory->prodMode();
 		}
 
-		return $factory
-			->setAuthenticationService(new AuthenticationService())
-			->setAuthorizationService(new AuthorizationService())
-			->createSchema();
+		$factory->addParameterMiddleware(new CakePHPParameterMiddleware());
+
+		return $factory;
 	}
 }

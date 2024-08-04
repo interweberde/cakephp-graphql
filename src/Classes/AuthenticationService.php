@@ -7,31 +7,23 @@ use Authentication\IdentityInterface;
 use Authorization\AuthorizationServiceInterface;
 use Cake\Http\Exception\InternalErrorException;
 use Cake\Routing\Router;
+use Psr\Http\Message\ServerRequestInterface;
 use TheCodingMachine\GraphQLite\Security\AuthenticationServiceInterface;
 
 class AuthenticationService implements AuthenticationServiceInterface {
-	/**
-	 * @var \Authentication\AuthenticationServiceInterface
-	 */
-	private $authentication;
+	public function __construct(protected readonly ServerRequestInterface $request) {
+	}
 
-	/**
-	 * @var \Authorization\AuthorizationServiceInterface
-	 */
-	private $authorization;
+	private \Authentication\AuthenticationServiceInterface|null $authentication = null;
+
+	private AuthorizationServiceInterface|null $authorization = null;
 
 	protected function getAuthenticationService(): \Authentication\AuthenticationServiceInterface {
 		if ($this->authentication) {
 			return $this->authentication;
 		}
 
-		$request = Router::getRequest();
-
-		if (!$request) {
-			throw new InternalErrorException('Request is not available');
-		}
-
-		$authentication = $request->getAttribute('authentication');
+		$authentication = $this->request->getAttribute('authentication');
 
 		if (!$authentication) {
 			throw new InternalErrorException('Authentication Service is missing!');
@@ -45,13 +37,7 @@ class AuthenticationService implements AuthenticationServiceInterface {
 			return $this->authorization;
 		}
 
-		$request = Router::getRequest();
-
-		if (!$request) {
-			throw new InternalErrorException('Request is not available');
-		}
-
-		$authorization = $request->getAttribute('authorization');
+		$authorization = $this->request->getAttribute('authorization');
 
 		if (!$authorization) {
 			throw new InternalErrorException('Authorization Service is missing!');
