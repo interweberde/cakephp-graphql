@@ -6,6 +6,7 @@ namespace Interweber\GraphQL\Classes;
 use Cake\Cache\Cache;
 use Cake\Core\Configure;
 use Cake\Core\Plugin;
+use DI\Definition\Source\SourceCache;
 use Interweber\GraphQL\Mapper\DateTypeMapperFactory;
 use Interweber\GraphQL\Mapper\SubscriptionTypeMapperFactory;
 use Kcs\ClassFinder\Finder\ComposerFinder;
@@ -17,8 +18,11 @@ class SchemaGenerator {
 
 		$builder = new \DI\ContainerBuilder();
 		if (!Configure::read('debug')) {
+			$builder->addDefinitions(TMP . 'di-classes.php');
 			$builder->enableCompilation(TMP . 'di-cache');
-			$builder->enableDefinitionCache();
+			if (SourceCache::isSupported()) {
+				$builder->enableDefinitionCache();
+			}
 		}
 
 		$container = $builder->build();
