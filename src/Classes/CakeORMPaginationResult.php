@@ -5,7 +5,7 @@ namespace Interweber\GraphQL\Classes;
 
 use Cake\Datasource\Exception\PageOutOfBoundsException;
 use Cake\Datasource\Paging\SimplePaginator;
-use Cake\ORM\Query;
+use Cake\ORM\Query\SelectQuery;
 use Closure;
 use Interweber\GraphQL\Exception\RecordNotFoundException;
 use Iterator;
@@ -18,24 +18,15 @@ use Iterator;
  * @implements \Interweber\GraphQL\Classes\PaginationResult<array-key, T>
  */
 class CakeORMPaginationResult implements PaginationResult {
-	/**
-	 * @var \Cake\ORM\Query
-	 */
-	protected $query;
-	/**
-	 * @var int
-	 */
-	protected $count = null;
-	/**
-	 * @var bool
-	 */
-	protected $noPageLimit = false;
-	/**
-	 * @var \Closure
-	 */
-	protected $mapResult = false;
+	protected SelectQuery $query;
 
-	public function __construct(Query $query, $noPageLimit = false, ?Closure $mapResult = null) {
+	protected ?int $count = null;
+
+	protected bool $noPageLimit = false;
+
+	protected Closure|null $mapResult = null;
+
+	public function __construct(SelectQuery $query, $noPageLimit = false, ?Closure $mapResult = null) {
 		$this->noPageLimit = $noPageLimit;
 
 		if (!$noPageLimit) {
@@ -71,11 +62,11 @@ class CakeORMPaginationResult implements PaginationResult {
 				'page' => $page,
 				'limit' => $limit,
 			]);
-		} catch (PageOutOfBoundsException $e) {
+		} catch (\Cake\Datasource\Paging\Exception\PageOutOfBoundsException $e) {
 			throw new RecordNotFoundException($e->getMessage());
 		}
 
-		return new CakeORMPaginationPage($results, $offset, $page, $limit, $this->count(), $this->mapResult);
+		return new CakeORMPaginationPage(collection($results), $offset, $page, $limit, $this->count(), $this->mapResult);
 	}
 
 	/**

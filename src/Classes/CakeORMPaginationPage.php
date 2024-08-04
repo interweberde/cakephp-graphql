@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Interweber\GraphQL\Classes;
 
+use Cake\Collection\CollectionInterface;
 use Cake\Datasource\ResultSetInterface;
 
 /**
@@ -38,7 +39,7 @@ class CakeORMPaginationPage implements PaginationPage {
 	 */
 	private $mapResults;
 
-	public function __construct(ResultSetInterface $resultSet, int $offset, int $page, int $limit, int $total, ?\Closure $mapResults = null) {
+	public function __construct(CollectionInterface $resultSet, int $offset, int $page, int $limit, int $total, ?\Closure $mapResults = null) {
 		$this->resultSet = $resultSet;
 		$this->offset = $offset;
 		$this->page = $page;
