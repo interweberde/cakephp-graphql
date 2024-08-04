@@ -29,7 +29,7 @@ use TheCodingMachine\GraphQLite\Schema;
  * @property AuthorizationComponent $Authorization
  */
 class GraphqlController extends Controller {
-	protected $modelClass = null;
+	protected ?string $modelClass = null;
 
 	/**
 	 * @var \Psr\Http\Server\MiddlewareInterface

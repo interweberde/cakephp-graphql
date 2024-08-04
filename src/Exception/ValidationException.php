@@ -9,7 +9,7 @@ use TheCodingMachine\GraphQLite\Exceptions\GraphQLException;
 
 class ValidationException extends GraphQLException {
 	public function __construct(string $message = 'Invalid data', ?string $field = null, ?string $type = null, int $code = 400) {
-		parent::__construct($message, $code, null, 'Validate', [
+		parent::__construct($message, $code, null, [
 			'field' => $field,
 			'type' => $type,
 		]);
