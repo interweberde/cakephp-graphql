@@ -25,7 +25,7 @@ class PrintSchemaCommand extends Command {
 		$parser = parent::buildOptionParser($parser);
 
 		$parser
-			->addArgument('file', ['required' => true]);
+			->addArgument('file');
 
 		return $parser;
 	}
@@ -40,6 +40,6 @@ class PrintSchemaCommand extends Command {
 	public function execute(Arguments $args, ConsoleIo $io) {
 		$schema = SchemaPrinter::doPrint(SchemaGenerator::getSchemaFactory()->createSchema());
 
-		file_put_contents($args->getArgument('file'), $schema);
+		$io->createFile($args->getArgument('file') ?: 'schema.graphql', $schema);
 	}
 }
