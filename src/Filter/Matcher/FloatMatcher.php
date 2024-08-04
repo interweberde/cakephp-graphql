@@ -5,11 +5,10 @@ namespace Interweber\GraphQL\Filter\Matcher;
 
 use Cake\Database\Expression\QueryExpression;
 use Cake\Database\ExpressionInterface;
-use Cake\ORM\Query;
-use TheCodingMachine\GraphQLite\Annotations\Factory;
+use Cake\ORM\Query\SelectQuery;
 
 class FloatMatcher extends BaseMatcher {
-	protected function __construct(
+	public function __construct(
 		?float $eq,
 		?float $neq,
 		?array $in,
@@ -23,34 +22,7 @@ class FloatMatcher extends BaseMatcher {
 		parent::__construct($eq, $neq, $in, $nin, $null);
 	}
 
-	/**
-	 * @param float|null $eq Match if Entry equals float
-	 * @param float|null $neq Match if Entry does not equal float
-	 * @param float[]|null $in Match if Entry is in list
-	 * @param float[]|null $nin Match if Entry is not in list
-	 * @param float|null $lte Match if Entry is less or equal than float
-	 * @param float|null $gte Match if Entry is greater or equal than float
-	 * @param float|null $lt Match if Entry is less than float
-	 * @param float|null $gt Match if Entry is greater than float
-	 * @param bool|null $null
-	 * @return FloatMatcher
-	 */
-	#[Factory]
-	public static function factory(
-		?float $eq,
-		?float $neq,
-		?array $in,
-		?array $nin,
-		?float $lte,
-		?float $gte,
-		?float $lt,
-		?float $gt,
-		?bool $null
-	): FloatMatcher {
-		return new self($eq, $neq, $in, $nin, $lte, $gte, $lt, $gt, $null);
-	}
-
-	public function build(Query $query, ExpressionInterface|string $field): QueryExpression | null {
+	public function build(SelectQuery $query, ExpressionInterface|string $field): QueryExpression | null {
 		$expr = $this->buildBasic($query, $field);
 
 		if ($this->lte) {

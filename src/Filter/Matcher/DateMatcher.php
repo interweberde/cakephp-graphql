@@ -5,12 +5,11 @@ namespace Interweber\GraphQL\Filter\Matcher;
 
 use Cake\Database\Expression\QueryExpression;
 use Cake\Database\ExpressionInterface;
-use Cake\ORM\Query;
+use Cake\ORM\Query\SelectQuery;
 use DateTimeImmutable;
-use TheCodingMachine\GraphQLite\Annotations\Factory;
 
 class DateMatcher extends BaseMatcher {
-	protected function __construct(
+	public function __construct(
 		?DateTimeImmutable $eq,
 		?DateTimeImmutable $neq,
 		?array $in,
@@ -24,34 +23,7 @@ class DateMatcher extends BaseMatcher {
 		parent::__construct($eq, $neq, $in, $nin, $null);
 	}
 
-	/**
-	 * @param DateTimeImmutable|null $eq Match if Entry equals DateTime
-	 * @param DateTimeImmutable|null $neq Match if Entry does not equal DateTime
-	 * @param DateTimeImmutable[]|null $in Match if Entry is in list
-	 * @param DateTimeImmutable[]|null $nin Match if Entry is not in list
-	 * @param DateTimeImmutable|null $lte Match if Entry is less or equal than DateTime
-	 * @param DateTimeImmutable|null $gte Match if Entry is greater or equal than DateTime
-	 * @param DateTimeImmutable|null $lt Match if Entry is less than DateTime
-	 * @param DateTimeImmutable|null $gt Match if Entry is greater than DateTime
-	 * @param bool|null $null Match if Entry is null
-	 * @return DateMatcher
-	 */
-	#[Factory]
-	public static function factory(
-		?DateTimeImmutable $eq,
-		?DateTimeImmutable $neq,
-		?array $in,
-		?array $nin,
-		?DateTimeImmutable $lte,
-		?DateTimeImmutable $gte,
-		?DateTimeImmutable $lt,
-		?DateTimeImmutable $gt,
-		?bool $null
-	): DateMatcher {
-		return new self($eq, $neq, $in, $nin, $lte, $gte, $lt, $gt, $null);
-	}
-
-	public function build(Query $query, ExpressionInterface|string $field): QueryExpression | null {
+	public function build(SelectQuery $query, ExpressionInterface|string $field): QueryExpression | null {
 		$expr = $this->buildBasic($query, $field);
 
 		if ($this->lte) {

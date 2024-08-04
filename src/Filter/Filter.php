@@ -6,7 +6,8 @@ namespace Interweber\GraphQL\Filter;
 use Cake\Database\Expression\QueryExpression;
 use Cake\Database\ExpressionInterface;
 use Cake\Http\Exception\InternalErrorException;
-use Cake\ORM\Query;
+use Cake\ORM\Query\SelectQuery;
+use Cake\Database\Query\SelectQuery as DbSelectQuery;
 use Interweber\GraphQL\Filter\Matcher\Matcher;
 
 class Filter {
@@ -18,7 +19,15 @@ class Filter {
 	) {
 	}
 
-	public function apply(Query $q): Query {
+	public function apply(SelectQuery $q): SelectQuery {
+		$q = $this->applyDb($q, $q->getRepository()->getAlias());
+
+		assert($q instanceof SelectQuery);
+
+		return $q;
+	}
+
+	public function applyDb(DbSelectQuery $q, string $alias): DbSelectQuery {
 		foreach ($this->filters as $field => $filter) {
 			if (!$filter) {
 				continue;
@@ -26,11 +35,11 @@ class Filter {
 
 			$expr = $filter;
 			if ($filter instanceof Matcher) {
-				$expr = $filter->build($q, $filter->aliasField($q, $field));
+				$expr = $filter->build($q, $filter->aliasField($q, $field, $alias));
 			} elseif ($filter instanceof \Closure) {
 				$res = $filter($q, $q->newExpr());
 
-				if ($res instanceof Query) {
+				if ($res instanceof DbSelectQuery) {
 					$q = $res;
 					$expr = $q->newExpr();
 				} elseif ($res instanceof ExpressionInterface) {

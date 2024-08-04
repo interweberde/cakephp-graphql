@@ -5,10 +5,10 @@ namespace Interweber\GraphQL\Filter\Matcher;
 
 use Cake\Database\Expression\QueryExpression;
 use Cake\Database\ExpressionInterface;
-use Cake\ORM\Query;
+use Cake\ORM\Query\SelectQuery;
 
 abstract class BaseMatcher extends Matcher {
-	protected function __construct(
+	public function __construct(
 		protected $eq,
 		protected $neq,
 		protected $in,
@@ -18,11 +18,11 @@ abstract class BaseMatcher extends Matcher {
 	}
 
 	/**
-	 * @param Query $query
+	 * @param SelectQuery $query
 	 * @param ExpressionInterface|string $field
 	 * @return QueryExpression
 	 */
-	protected function buildBasic(Query $query, ExpressionInterface|string $field): QueryExpression {
+	protected function buildBasic(SelectQuery $query, ExpressionInterface|string $field): QueryExpression {
 		$expr = $query->newExpr();
 
 		if ($this->eq !== null) {

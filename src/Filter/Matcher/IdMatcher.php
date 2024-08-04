@@ -5,34 +5,26 @@ namespace Interweber\GraphQL\Filter\Matcher;
 
 use Cake\Database\Expression\QueryExpression;
 use Cake\Database\ExpressionInterface;
-use Cake\ORM\Query;
-use TheCodingMachine\GraphQLite\Annotations\Factory;
+use Cake\ORM\Query\SelectQuery;
 use TheCodingMachine\GraphQLite\Types\ID;
 
 class IdMatcher extends BaseMatcher {
-	/**
-	 * @param ID|null $eq
-	 * @param ID|null $neq
-	 * @param ID[]|null $in
-	 * @param ID[]|null $nin
-	 * @return IdMatcher
-	 */
-	#[Factory]
-	public static function factory(
+	public function __construct(
 		?ID $eq,
 		?ID $neq,
-		?array $in,
-		?array $nin,
-	): IdMatcher {
-		return new self($eq, $neq, $in, $nin, null);
+		?ID $in,
+		?ID $nin,
+		?bool $null
+	) {
+		parent::__construct($eq, $neq, $in, $nin, $null);
 	}
 
-	public function build(Query $query, ExpressionInterface|string $field): QueryExpression {
+	public function build(SelectQuery $query, ExpressionInterface|string $field): QueryExpression {
 		return $this->buildBasic($query, $field);
 	}
 
 	public function buildRelation(string $relation, string $field): \Closure {
-		return function (Query $query, QueryExpression $exp) use ($relation, $field) {
+		return function (SelectQuery $query, QueryExpression $exp) use ($relation, $field) {
 			$pk = $query->getRepository()->aliasField($query->getRepository()->getPrimaryKey());
 
 			return $query
