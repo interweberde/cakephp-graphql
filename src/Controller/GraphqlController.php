@@ -15,6 +15,7 @@ use GraphQL\Error\DebugFlag;
 use GraphQL\Error\Error;
 use Interweber\GraphQL\Classes\AuthenticationService;
 use Interweber\GraphQL\Classes\AuthorizationService;
+use Interweber\GraphQL\Classes\CakePHPRequestContext;
 use Interweber\GraphQL\Classes\SchemaGenerator;
 use Interweber\GraphQL\Classes\StaticRequestHandler;
 use Interweber\GraphQL\Exception\ValidationException;
@@ -122,6 +123,10 @@ class GraphqlController extends Controller {
 					: DebugFlag::NONE
 			)
 			->setQueryBatching(true);
+
+		$config->setContext(
+			new CakePHPRequestContext($this->request)
+		);
 
 		$builder
 			->setUrl('/__graphql');
