@@ -49,7 +49,7 @@ class Filter {
 				}
 			}
 
-			if (!$expr) {
+			if (!$expr || !$expr->count()) {
 				continue;
 			}
 
