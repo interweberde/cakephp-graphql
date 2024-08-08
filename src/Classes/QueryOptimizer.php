@@ -5,16 +5,19 @@ namespace Interweber\GraphQL\Classes;
 
 use Authorization\AuthorizationServiceInterface;
 use Authorization\IdentityInterface;
+use Cake\Cache\Cache;
 use Cake\Datasource\EntityInterface;
 use Cake\Datasource\FactoryLocator;
 use Cake\ORM\Association\BelongsTo;
 use Cake\ORM\Association\BelongsToMany;
 use Cake\ORM\Association\HasMany;
 use Cake\ORM\Query\SelectQuery;
+use Cake\ORM\Table;
 use Cake\Utility\Hash;
 use Cake\Utility\Inflector;
 use GraphQL\Type\Definition\ResolveInfo;
 use Interweber\GraphQL\Annotation\FieldDependencies;
+use TheCodingMachine\GraphQLite\Annotations\MagicField;
 
 // CAUTION!
 // Only change things here if you are 100% sure what you are doing!
@@ -215,11 +218,17 @@ class QueryOptimizer {
 				continue;
 			}
 
-			if (!$Model->hasField($field)) {
+			if ($Model->hasField($field)) {
+				$select[] = $field;
 				continue;
 			}
 
-			$select[] = $field;
+			$sourceName = self::getSourceNameForField($Model, $field, [$Model, 'hasField']);
+			if (!$sourceName) {
+				continue;
+			}
+
+			$select[] = $sourceName;
 		}
 
 		$contain = QueryOptimizer::getContainKeys($Model, $contain);
@@ -291,9 +300,18 @@ class QueryOptimizer {
 				$q = $authorizationService->applyScope($user, $authorizationScope, $q);
 
 				$AssocModel = $q->getRepository();
-				$fields = array_filter($value['fields'] ?? [], function ($field) use ($AssocModel) {
-					return $AssocModel->hasField($field);
-				});
+				$fields = array_filter(
+					array_map(
+						function ($field) use ($AssocModel) {
+							if ($AssocModel->hasField($field)) {
+								return $field;
+							}
+
+							return self::getSourceNameForField($AssocModel, $field, [$AssocModel, 'hasField']);
+						},
+						$value['fields'] ?? []
+					)
+				);
 
 				$forceFields = $AssocModel->forceFields ?? [];
 				foreach ($forceFields as $forceField) {
@@ -365,14 +383,10 @@ class QueryOptimizer {
 				continue;
 			}
 
-			$itemKey = Inflector::camelize($itemKey);
+			$itemKey = static::getRealContainItemKey($Model, $itemKey);
 
-			if (!$Model->hasAssociation($itemKey)) {
-				$itemKey = Inflector::pluralize($itemKey);
-
-				if (!$Model->hasAssociation($itemKey)) {
-					continue;
-				}
+			if (!$itemKey) {
+				continue;
 			}
 
 			$result = array_merge($result, QueryOptimizer::getContainKeys(
@@ -387,6 +401,36 @@ class QueryOptimizer {
 		return $result;
 	}
 
+	protected static function getRealContainItemKey(Table $Model, string $itemKey): ?string {
+		$tryKey = Inflector::camelize($itemKey);
+
+		if ($Model->hasAssociation($tryKey)) {
+			return $tryKey;
+		}
+
+		$tryKey = Inflector::pluralize($tryKey);
+
+		if ($Model->hasAssociation($tryKey)) {
+			return $tryKey;
+		}
+
+		return self::getSourceNameForField($Model, $itemKey, function (string $itemKey) use ($Model) {
+			$tryKey = Inflector::camelize($itemKey);
+
+			if ($Model->hasAssociation($tryKey)) {
+				return $tryKey;
+			}
+
+			$tryKey = Inflector::pluralize($tryKey);
+
+			if ($Model->hasAssociation($tryKey)) {
+				return $tryKey;
+			}
+
+			return null;
+		});
+	}
+
 	protected static function checkAndAddSelect(array $select, string $item): array {
 		if (in_array($item, $select)) {
 			return $select;
@@ -395,5 +439,43 @@ class QueryOptimizer {
 		$select[] = $item;
 
 		return $select;
+	}
+
+	/**
+	 * @param \Cake\ORM\Table $Model
+	 * @param string $field
+	 * @param callable(string $field): boolean|string|null $validateField
+	 * @return string|null
+	 * @throws \ReflectionException
+	 */
+	protected static function getSourceNameForField(\Cake\ORM\Table $Model, string $field, callable $validateField): ?string {
+		$class = $Model->getEntityClass();
+		$key_class = str_replace(['\\', '{', '}', '(', ')', '/', '@', ':'], '_', $class);
+		$magicFieldArgs = Cache::remember('cake-query-optimizer_' . $key_class, function () use ($class) {
+			$entityReflection = new \ReflectionClass($class);
+			return array_map(fn (\ReflectionAttribute $a) => $a->getArguments(), $entityReflection->getAttributes(MagicField::class));
+		}, 'graphql');
+
+		foreach ($magicFieldArgs as $args) {
+			$name = $args['name'] ?? null;
+
+			if (!$name || $name !== $field) {
+				continue;
+			}
+
+			$sourceName = $args['sourceName'] ?? null;
+			$res = $validateField($sourceName);
+			if ($res === false || $res === null) {
+				continue;
+			}
+
+			if (is_string($res)) {
+				return $res;
+			}
+
+			return $sourceName;
+		}
+
+		return null;
 	}
 }
