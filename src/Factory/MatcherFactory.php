@@ -119,8 +119,9 @@ class MatcherFactory {
 		?ID $neq,
 		?array $in,
 		?array $nin,
+		?bool $null
 	): IdMatcher {
-		return new IdMatcher($eq, $neq, $in, $nin, null);
+		return new IdMatcher($eq, $neq, $in, $nin, $null);
 	}
 
 	/**
