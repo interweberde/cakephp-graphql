@@ -17,6 +17,7 @@ use Cake\Utility\Hash;
 use Cake\Utility\Inflector;
 use GraphQL\Type\Definition\ResolveInfo;
 use Interweber\GraphQL\Annotation\FieldDependencies;
+use ReflectionClass;
 use TheCodingMachine\GraphQLite\Annotations\MagicField;
 
 // CAUTION!
@@ -104,6 +105,24 @@ class QueryOptimizer {
 		return $methodReflection;
 	}
 
+	protected static function _getFieldDependency(string $entityClass, string $field): FieldDependencies|null {
+		return Cache::remember(static::_escapeCacheKey($entityClass . '::' . $field), function () use ($field, $entityClass) {
+			$entityReflection = new ReflectionClass($entityClass);
+			$methodReflection = static::_getFieldGetterReflection($entityReflection, $field);
+			if (!$methodReflection) {
+				return null;
+			}
+
+			$dependencyAttribute = $methodReflection->getAttributes(FieldDependencies::class)[0] ?? null;
+
+			if (!$dependencyAttribute) {
+				return null;
+			}
+
+			return new FieldDependencies($dependencyAttribute->getArguments());
+		}, 'graphql');
+	}
+
 	protected static function _generateFields(array $_fields, \Cake\ORM\Table $Model) {
 		$forceFields = $Model->forceFields ?? [];
 		foreach ($forceFields as $forceField) {
@@ -114,7 +133,6 @@ class QueryOptimizer {
 			yield $forceField => true;
 		}
 
-		$entityReflection = new \ReflectionClass($Model->getEntityClass());
 		foreach ($_fields as $field => $value) {
 			if (is_numeric($field)) {
 				$field = $value;
@@ -131,51 +149,46 @@ class QueryOptimizer {
 
 			$fieldsRemapped = false;
 
-			$methodReflection = static::_getFieldGetterReflection($entityReflection, $field);
-			if ($methodReflection) {
-				$dependencyAttribute = $methodReflection->getAttributes(FieldDependencies::class)[0] ?? null;
-
-				if ($dependencyAttribute) {
-					$dependency = new FieldDependencies($dependencyAttribute->getArguments());
-					$remapFields = $dependency->getRemapFields();
-					$dependencies = $dependency->getDependencies();
-					foreach ($dependencies as $dependencyKey => $dependencyValue) {
-						if (is_numeric($dependencyKey)) {
-							if (!is_string($dependencyValue)) {
-								throw new \Exception(
-									sprintf(
-										'malformed dependency in field: %s::%s',
-										$Model->getEntityClass(),
-										$field
-									)
-								);
-							}
-
-							$dependencyKey = $dependencyValue;
-							$dependencyValue = true;
+			$dependency = static::_getFieldDependency($Model->getEntityClass(), $field);
+			if ($dependency) {
+				$remapFields = $dependency->getRemapFields();
+				$dependencies = $dependency->getDependencies();
+				foreach ($dependencies as $dependencyKey => $dependencyValue) {
+					if (is_numeric($dependencyKey)) {
+						if (!is_string($dependencyValue)) {
+							throw new \Exception(
+								sprintf(
+									'malformed dependency in field: %s::%s',
+									$Model->getEntityClass(),
+									$field
+								)
+							);
 						}
 
-						if ($remapFields === true || $remapFields === $dependencyKey) {
-							$fieldsRemapped = true;
-							$dependencyValue = $value;
+						$dependencyKey = $dependencyValue;
+						$dependencyValue = true;
+					}
+
+					if ($remapFields === true || $remapFields === $dependencyKey) {
+						$fieldsRemapped = true;
+						$dependencyValue = $value;
+					}
+
+					if (is_string($dependencyValue) && $dependencyValue !== '*') {
+						$dependencyKey = $dependencyKey . '.' . $dependencyValue;
+						$dependencyValue = true;
+					}
+
+					$nested = Hash::expand([$dependencyKey => $dependencyValue]);
+
+					foreach ($nested as $k => $v) {
+						if (is_array($v)) {
+							yield $k => $v;
+
+							continue;
 						}
 
-						if (is_string($dependencyValue) && $dependencyValue !== '*') {
-							$dependencyKey = $dependencyKey . '.' . $dependencyValue;
-							$dependencyValue = true;
-						}
-
-						$nested = Hash::expand([$dependencyKey => $dependencyValue]);
-
-						foreach ($nested as $k => $v) {
-							if (is_array($v)) {
-								yield $k => $v;
-
-								continue;
-							}
-
-							yield $k => true;
-						}
+						yield $k => true;
 					}
 				}
 			}
@@ -450,8 +463,7 @@ class QueryOptimizer {
 	 */
 	protected static function getSourceNameForField(\Cake\ORM\Table $Model, string $field, callable $validateField): ?string {
 		$class = $Model->getEntityClass();
-		$key_class = str_replace(['\\', '{', '}', '(', ')', '/', '@', ':'], '_', $class);
-		$magicFieldArgs = Cache::remember('cake-query-optimizer_' . $key_class, function () use ($class) {
+		$magicFieldArgs = Cache::remember(static::_escapeCacheKey('cake-query-optimizer_' . $key_class), function () use ($class) {
 			$entityReflection = new \ReflectionClass($class);
 			return array_map(fn (\ReflectionAttribute $a) => $a->getArguments(), $entityReflection->getAttributes(MagicField::class));
 		}, 'graphql');
@@ -481,5 +493,9 @@ class QueryOptimizer {
 		}
 
 		return null;
+	}
+
+	protected static function _escapeCacheKey(string $key): string {
+		return str_replace(['\\', '{', '}', '(', ')', '/', '@', ':'], '_', $key);
 	}
 }
