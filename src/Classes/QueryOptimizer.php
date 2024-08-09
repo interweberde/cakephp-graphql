@@ -464,6 +464,10 @@ class QueryOptimizer {
 			}
 
 			$sourceName = $args['sourceName'] ?? null;
+			if ($sourceName === null) {
+				continue;
+			}
+
 			$res = $validateField($sourceName);
 			if ($res === false || $res === null) {
 				continue;
