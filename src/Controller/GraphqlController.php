@@ -106,6 +106,8 @@ class GraphqlController extends Controller {
 			->setAuthenticationService(new AuthenticationService($this->request))
 			->setAuthorizationService(new AuthorizationService());
 
+		$this->getEventManager()->dispatch(new Event('beforeCreateGraphQlSchema', $this, ['factory' => $schemaFactory]));
+
 		$schema = $schemaFactory->createSchema();
 
 		$builder = new Psr15GraphQLMiddlewareBuilder($schema);

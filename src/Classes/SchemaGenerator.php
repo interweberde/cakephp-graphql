@@ -6,6 +6,8 @@ namespace Interweber\GraphQL\Classes;
 use Cake\Cache\Cache;
 use Cake\Core\Configure;
 use Cake\Core\Plugin;
+use Cake\Event\Event;
+use Cake\Event\EventManager;
 use DI\Definition\Source\SourceCache;
 use Interweber\GraphQL\Mapper\DateTypeMapperFactory;
 use Interweber\GraphQL\Mapper\SubscriptionTypeMapperFactory;
@@ -48,6 +50,8 @@ class SchemaGenerator {
 		}
 
 		$factory->addParameterMiddleware(new CakePHPParameterMiddleware());
+
+		EventManager::instance()->dispatch(new Event('onCreateGraphQlSchemaFactory', null, ['factory' => $factory]));
 
 		return $factory;
 	}
