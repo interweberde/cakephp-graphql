@@ -232,9 +232,7 @@ class QueryOptimizer {
 		}
 	}
 
-	public static function getRequestedQueryFields(ResolveInfo $info, SelectQuery $query, AuthorizationServiceInterface $authorizationService, ?IdentityInterface $identity, array $authorizationScopes, bool $pagination = false): array {
-		$_fields = $info->getFieldSelection(6);
-
+	protected static function _getModelFieldsAndContain(array $_fields, \Cake\ORM\Table $Model, bool $pagination) {
 		$select = [
 			'id',
 		];
@@ -243,9 +241,6 @@ class QueryOptimizer {
 		if ($pagination) {
 			$_fields = $_fields['items'] ?? $_fields;
 		}
-
-		/** @var \Cake\ORM\Table $Model */
-		$Model = FactoryLocator::get('Table')->get($query->getRepository()->getRegistryAlias());
 
 		$fields = static::_generateFields($_fields, $Model);
 
@@ -258,7 +253,7 @@ class QueryOptimizer {
 			/** @var callable|null $virtualField */
 			$virtualField = $Model->virtualFields[$field] ?? false;
 			if ($virtualField) {
-				$select[$field] = $virtualField($query);
+				$select[$field] = '__virtual_field__';
 				continue;
 			}
 
@@ -338,6 +333,70 @@ class QueryOptimizer {
 			$contain[$key]['fields'] = static::checkAndAddSelect($value['fields'] ?? [], $containKey);
 		}
 
+		return [
+			'select' => $select,
+			'contain' => $contain,
+		];
+	}
+
+	/**
+	 * @param array $select
+	 * @param Table $Model
+	 * @param SelectQuery $query
+	 * @return mixed
+	 * @throws \RuntimeException
+	 */
+	public static function _applyVirtualFields(array $select, Table $Model, SelectQuery $query): mixed {
+		foreach ($select as $field => $value) {
+			if ($value !== '__virtual_field__') {
+				continue;
+			}
+
+			/** @var callable|null $virtualField */
+			$virtualField = $Model->virtualFields[$field] ?? false;
+			if (!$virtualField) {
+				throw new \RuntimeException('could not resolve virtual Field: ' . $field);
+			}
+
+			$select[$field] = $virtualField($query);
+		}
+
+		return $select;
+	}
+
+	/**
+	 * @param ResolveInfo $info
+	 * @param Table $Model
+	 * @param bool $pagination
+	 * @param SelectQuery $query
+	 * @return array
+	 * @throws \RuntimeException
+	 */
+	public static function _getModelFieldsAndContainCached(ResolveInfo $info, Table $Model, bool $pagination, SelectQuery $query): array {
+		$_fields = $info->getFieldSelection(6);
+		$key = 'cake-query-fields-' . static::_escapeCacheKey($Model->getEntityClass()) . '-' . hash('xxh128', serialize($_fields));
+		['select' => $select, 'contain' => $contain] = Cache::remember($key, fn() => static::_getModelFieldsAndContain($_fields, $Model, $pagination), 'graphql');
+
+		try {
+			$select = static::_applyVirtualFields($select, $Model, $query);
+		} catch (\RuntimeException $e) {
+			// A virtual field could not be resolved. Try again without cache...
+			static::_getModelFieldsAndContain($_fields, $Model, $pagination);
+			$select = static::_applyVirtualFields($select, $Model, $query);
+		}
+
+		return [
+			'select' => $select,
+			'contain' => $contain,
+		];
+	}
+
+	public static function getRequestedQueryFields(ResolveInfo $info, SelectQuery $query, AuthorizationServiceInterface $authorizationService, ?IdentityInterface $identity, array $authorizationScopes, bool $pagination = false): array {
+		/** @var \Cake\ORM\Table $Model */
+		$Model = FactoryLocator::get('Table')->get($query->getRepository()->getRegistryAlias());
+
+		['select' => $select, 'contain' => $contain] = static::_getModelFieldsAndContainCached($info, $Model, $pagination, $query);
+
 		foreach ($contain as $key => $value) {
 			$contain[$key] = function (SelectQuery $q) use ($authorizationService, $query, $authorizationScopes, $identity, $value, $key) {
 				/** @var SelectQuery $q */
@@ -389,6 +448,7 @@ class QueryOptimizer {
 	 * @param array<array-key, array|string|bool> $items
 	 * @param string $key
 	 * @return array Array compatible with Query::contain()
+	 * @throws \Exception
 	 * @see Query::contain()
 	 */
 	protected static function getContainKeys(\Cake\ORM\Table $Model, array $items, string $key = ''): array {
@@ -494,7 +554,7 @@ class QueryOptimizer {
 	 */
 	protected static function getSourceNameForField(\Cake\ORM\Table $Model, string $field, callable $validateField): ?string {
 		$class = $Model->getEntityClass();
-		$magicFieldArgs = Cache::remember(static::_escapeCacheKey('cake-query-optimizer_' . $key_class), function () use ($class) {
+		$magicFieldArgs = Cache::remember(static::_escapeCacheKey('cake-query-optimizer_' . $class), function () use ($class) {
 			$entityReflection = new \ReflectionClass($class);
 			return array_map(fn (\ReflectionAttribute $a) => $a->getArguments(), $entityReflection->getAttributes(MagicField::class));
 		}, 'graphql');
