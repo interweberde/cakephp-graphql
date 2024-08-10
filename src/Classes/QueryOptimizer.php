@@ -461,8 +461,13 @@ class QueryOptimizer {
 	 * @return array
 	 * @throws \RuntimeException
 	 */
-	protected static function _getModelFieldsAndContainCached(ResolveInfo $info, Table $Model, bool $pagination, SelectQuery $query): array {
-		$_fields = $info->getFieldSelection(6);
+	protected static function _getModelFieldsAndContainCached(ResolveInfo|array $info, Table $Model, bool $pagination, SelectQuery $query): array {
+		if ($info instanceof ResolveInfo) {
+			$_fields = $info->getFieldSelection(6);
+		} else {
+			$_fields = $info;
+		}
+
 		$key = 'cake-query-fields-' . static::_escapeCacheKey($Model->getEntityClass()) . '-' . hash('xxh128', serialize($_fields));
 		['select' => $select, 'contain' => $contain] = Cache::remember($key, fn() => static::_getModelFieldsAndContain($_fields, $Model, $pagination), 'graphql');
 
@@ -481,14 +486,14 @@ class QueryOptimizer {
 	}
 
 	/**
-	 * @param ResolveInfo $info
+	 * @param ResolveInfo|array $info
 	 * @param SelectQuery $query
 	 * @param callable(string $scope, SelectQuery $query): SelectQuery $applyScope
 	 * @param array $authorizationScopes
 	 * @param bool $pagination
 	 * @return array
 	 */
-	protected static function getRequestedQueryFields(ResolveInfo $info, SelectQuery $query, callable $applyScope, array $authorizationScopes, bool $pagination = false): array {
+	protected static function getRequestedQueryFields(ResolveInfo|array $info, SelectQuery $query, callable $applyScope, array $authorizationScopes, bool $pagination = false): array {
 		/** @var \Cake\ORM\Table $Model */
 		$Model = FactoryLocator::get('Table')->get($query->getRepository()->getRegistryAlias());
 
