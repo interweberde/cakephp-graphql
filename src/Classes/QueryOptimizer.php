@@ -27,18 +27,29 @@ use TheCodingMachine\GraphQLite\Annotations\MagicField;
 // may fix or ease one case, but break 5 others.
 // That being said: Happy hacking!
 class QueryOptimizer {
-	public static function optimizeQuery(SelectQuery $query, ResolveInfo $info, AuthorizationServiceInterface $authorizationService, ?IdentityInterface $user, string $authorizationScope, bool $pagination = false): SelectQuery {
+	/**
+	 * @param SelectQuery $query Query to be adjusted. The query instance will be mutated.
+	 * @param ResolveInfo $info GraphQL ResolveInfo
+	 * @param AuthorizationServiceInterface $authorizationService Authorization Service for authorization
+	 * @param IdentityInterface|null $identity Identity for authorization
+	 * @param string|array<string, string> $authorizationScopes Set the main authorization scope that will be applied to the query and associations. Alternatively, pass an array with authorization scopes: default, main query (key: 'query'), all associations (key: 'assoc') or select associations (key: individual association name).
+	 * @param bool $pagination Enable this flag when applying the optimizer on a paginated query
+	 * @return SelectQuery
+	 */
+	public static function optimizeQuery(SelectQuery $query, ResolveInfo $info, AuthorizationServiceInterface $authorizationService, ?IdentityInterface $identity, string|array $authorizationScopes, bool $pagination = false): SelectQuery {
+		$authorizationScopes = static::_prepareAuthorizationScopes($authorizationScopes);
+
 		[
 			'select' => $select,
 			'contain' => $contain,
-		] = QueryOptimizer::getRequestedQueryFields($info, $query, $authorizationService, $user, $authorizationScope, $pagination);
+		] = QueryOptimizer::getRequestedQueryFields($info, $query, $authorizationService, $identity, $authorizationScopes, $pagination);
 
 		$query = $query
 			->select($select)
 			->enableAutoFields()
 			->contain($contain);
 
-		return $authorizationService->applyScope($user, $authorizationScope, $query);
+		return $authorizationService->applyScope($identity, $authorizationScopes['query'] ?? $authorizationScopes['default'], $query);
 	}
 
 	/**
@@ -47,15 +58,18 @@ class QueryOptimizer {
 	 * @psalm-return T
 	 * @param \Cake\Datasource\EntityInterface $entity
 	 * @param \GraphQL\Type\Definition\ResolveInfo $info
-	 * @param \Authorization\IdentityInterface $user
-	 * @param string $authorizationScope
+	 * @param \Authorization\IdentityInterface $identity
+	 * @param string|array<string, string> $authorizationScopes
 	 * @param bool $pagination
 	 * @return \Cake\Datasource\EntityInterface
+	 * @see QueryOptimizer::optimizeQuery()
 	 */
-	public static function loadRequestedFieldsIntoEntity(EntityInterface $entity, ResolveInfo $info, IdentityInterface $user, string $authorizationScope, bool $pagination = false): EntityInterface {
+	public static function loadRequestedFieldsIntoEntity(EntityInterface $entity, ResolveInfo $info, IdentityInterface $identity, string|array $authorizationScopes, bool $pagination = false): EntityInterface {
+		$authorizationScopes = static::_prepareAuthorizationScopes($authorizationScopes);
+
 		/** @var \Cake\ORM\Table $Model */
 		$Model = FactoryLocator::get('Table')->get($entity->getSource());
-		['contain' => $contain] = static::getRequestedQueryFields($info, $Model->query(), $user, $authorizationScope, $pagination);
+		['contain' => $contain] = static::getRequestedQueryFields($info, $Model->query(), $identity, $authorizationScope, $pagination);
 
 		/** @psalm-var T $entity */
 		$entity = $Model->loadInto($entity, $contain);
@@ -69,24 +83,41 @@ class QueryOptimizer {
 	 * @psalm-return T[]
 	 * @param \Cake\Datasource\EntityInterface[] $entities
 	 * @param \GraphQL\Type\Definition\ResolveInfo $info
-	 * @param \Authorization\IdentityInterface $user
-	 * @param string $authorizationScope
+	 * @param \Authorization\IdentityInterface $identity
+	 * @param string|array<string, string> $authorizationScopes
 	 * @param bool $pagination
 	 * @return \Cake\Datasource\EntityInterface[]
+	 * @see QueryOptimizer::optimizeQuery()
 	 */
-	public static function loadRequestedFieldsIntoEntities(array $entities, ResolveInfo $info, IdentityInterface $user, string $authorizationScope, bool $pagination = false): array {
+	public static function loadRequestedFieldsIntoEntities(array $entities, ResolveInfo $info, IdentityInterface $identity, string|array $authorizationScopes, bool $pagination = false): array {
 		if (count($entities) === 0) {
 			return $entities;
 		}
 
+		$authorizationScopes = static::_prepareAuthorizationScopes($authorizationScopes);
+
 		/** @var \Cake\ORM\Table $Model */
 		$Model = FactoryLocator::get('Table')->get($entities[0]->getSource());
-		['contain' => $contain] = static::getRequestedQueryFields($info, $Model->query(), $user, $authorizationScope, $pagination);
+		['contain' => $contain] = static::getRequestedQueryFields($info, $Model->query(), $identity, $authorizationScope, $pagination);
 
 		/** @psalm-var T[] $entities */
 		$entities = $Model->loadInto($entities, $contain);
 
 		return $entities;
+	}
+
+	protected static function _prepareAuthorizationScopes(string|array $authorizationScopes): array {
+		if (is_string($authorizationScopes)) {
+			$authorizationScopes = [
+				'default' => $authorizationScopes,
+			];
+		}
+
+		if (!isset($authorizationScopes['default'])) {
+			throw new \InvalidArgumentException('Authorization scopes require "default" key');
+		}
+
+		return $authorizationScopes;
 	}
 
 	protected static function _getFieldGetterReflection(\ReflectionClass $entityReflection, string $field): \ReflectionMethod|null {
@@ -201,7 +232,7 @@ class QueryOptimizer {
 		}
 	}
 
-	public static function getRequestedQueryFields(ResolveInfo $info, SelectQuery $query, AuthorizationServiceInterface $authorizationService, ?IdentityInterface $user, string $authorizationScope, bool $pagination = false): array {
+	public static function getRequestedQueryFields(ResolveInfo $info, SelectQuery $query, AuthorizationServiceInterface $authorizationService, ?IdentityInterface $identity, array $authorizationScopes, bool $pagination = false): array {
 		$_fields = $info->getFieldSelection(6);
 
 		$select = [
@@ -308,9 +339,9 @@ class QueryOptimizer {
 		}
 
 		foreach ($contain as $key => $value) {
-			$contain[$key] = function (SelectQuery $q) use ($authorizationService, $query, $authorizationScope, $user, $value) {
+			$contain[$key] = function (SelectQuery $q) use ($authorizationService, $query, $authorizationScopes, $identity, $value, $key) {
 				/** @var SelectQuery $q */
-				$q = $authorizationService->applyScope($user, $authorizationScope, $q);
+				$q = $authorizationService->applyScope($identity, $authorizationScopes[$key] ?? $authorizationScopes['assoc'] ?? $authorizationScopes['default'], $q);
 
 				$AssocModel = $q->getRepository();
 				$fields = array_filter(
