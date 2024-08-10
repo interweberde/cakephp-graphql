@@ -346,7 +346,7 @@ class QueryOptimizer {
 	 * @return mixed
 	 * @throws \RuntimeException
 	 */
-	public static function _applyVirtualFields(array $select, Table $Model, SelectQuery $query): mixed {
+	protected static function _applyVirtualFields(array $select, Table $Model, SelectQuery $query): mixed {
 		foreach ($select as $field => $value) {
 			if ($value !== '__virtual_field__') {
 				continue;
@@ -372,7 +372,7 @@ class QueryOptimizer {
 	 * @return array
 	 * @throws \RuntimeException
 	 */
-	public static function _getModelFieldsAndContainCached(ResolveInfo $info, Table $Model, bool $pagination, SelectQuery $query): array {
+	protected static function _getModelFieldsAndContainCached(ResolveInfo $info, Table $Model, bool $pagination, SelectQuery $query): array {
 		$_fields = $info->getFieldSelection(6);
 		$key = 'cake-query-fields-' . static::_escapeCacheKey($Model->getEntityClass()) . '-' . hash('xxh128', serialize($_fields));
 		['select' => $select, 'contain' => $contain] = Cache::remember($key, fn() => static::_getModelFieldsAndContain($_fields, $Model, $pagination), 'graphql');
@@ -391,7 +391,7 @@ class QueryOptimizer {
 		];
 	}
 
-	public static function getRequestedQueryFields(ResolveInfo $info, SelectQuery $query, AuthorizationServiceInterface $authorizationService, ?IdentityInterface $identity, array $authorizationScopes, bool $pagination = false): array {
+	protected static function getRequestedQueryFields(ResolveInfo $info, SelectQuery $query, AuthorizationServiceInterface $authorizationService, ?IdentityInterface $identity, array $authorizationScopes, bool $pagination = false): array {
 		/** @var \Cake\ORM\Table $Model */
 		$Model = FactoryLocator::get('Table')->get($query->getRepository()->getRegistryAlias());
 
