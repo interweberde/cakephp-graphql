@@ -12,6 +12,7 @@ use DI\Definition\Source\SourceCache;
 use Interweber\GraphQL\Mapper\DateTypeMapperFactory;
 use Interweber\GraphQL\Mapper\SubscriptionTypeMapperFactory;
 use Kcs\ClassFinder\Finder\ComposerFinder;
+use Kcs\ClassFinder\Finder\FinderInterface;
 use TheCodingMachine\GraphQLite\SchemaFactory;
 
 class SchemaGenerator {
@@ -32,9 +33,21 @@ class SchemaGenerator {
 		$pluginPath = Plugin::classPath('Interweber/GraphQL');
 		$path = str_replace(ROOT . DS, '', $pluginPath);
 
-		$classNameMapper = new ComposerFinder();
-		$classNameMapper
-			->notInNamespace('App\\Test\\');
+		$result = EventManager::instance()->dispatch(
+			new Event('getGraphQlClassNameMapper', null)
+		)->getResult();
+
+		if ($result) {
+			if (!$result instanceof FinderInterface) {
+				throw new \InvalidArgumentException('Event must return FinderInterface instance or null');
+			}
+
+			$classNameMapper = $result;
+		} else {
+			$classNameMapper = new ComposerFinder();
+			$classNameMapper
+				->notInNamespace('App\\Test\\');
+		}
 
 		$factory = new SchemaFactory($cache, $container);
 		$factory->setFinder($classNameMapper);
