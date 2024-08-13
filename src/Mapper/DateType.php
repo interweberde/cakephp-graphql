@@ -3,12 +3,14 @@ declare(strict_types=1);
 
 namespace Interweber\GraphQL\Mapper;
 
+use Cake\Chronos\ChronosDate;
 use Cake\I18n\Date;
 use DateTimeImmutable;
 use DateTimeInterface;
 use GraphQL\Error\InvariantViolation;
 use GraphQL\Language\AST\StringValueNode;
 use GraphQL\Type\Definition\ScalarType;
+use GraphQL\Utils\Utils;
 use TheCodingMachine\GraphQLite\GraphQLRuntimeException;
 
 class DateType extends ScalarType {
@@ -18,11 +20,15 @@ class DateType extends ScalarType {
 	public string $name = 'Date';
 
 	public function serialize(mixed $value): string {
-		if (!$value instanceof DateTimeImmutable) {
+		if ($value instanceof DateTimeImmutable) {
+			return $value->format(DateTimeInterface::ATOM);
+		}
+
+		if (!$value instanceof ChronosDate) {
 			throw new InvariantViolation('DateTime is not an instance of DateTimeImmutable: ' . Utils::printSafe($value));
 		}
 
-		return $value->format(DateTimeInterface::ATOM);
+		return $value->toIso8601String();
 	}
 
 	/**
