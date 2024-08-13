@@ -12,8 +12,8 @@ class IdMatcher extends BaseMatcher {
 	public function __construct(
 		?ID $eq,
 		?ID $neq,
-		?ID $in,
-		?ID $nin,
+		?array $in,
+		?array $nin,
 		?bool $null
 	) {
 		parent::__construct($eq, $neq, $in, $nin, $null);
