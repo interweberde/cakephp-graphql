@@ -27,16 +27,22 @@ class IdMatcher extends BaseMatcher {
 		return function (SelectQuery $query, QueryExpression $exp) use ($relation, $field) {
 			$pk = $query->getRepository()->aliasField($query->getRepository()->getPrimaryKey());
 
+			$filterExp = $this->build(
+				$query,
+				$query->getRepository()->getAssociation($relation)->aliasField($field)
+			);
+
+			if (!$filterExp->count()) {
+				return $query;
+			}
+
 			return $query
 				->where($exp->in(
 					$pk,
 					$query->getRepository()->find()
 						->select($pk)
 						->leftJoinWith($relation)
-						->where($this->build(
-							$query,
-							$query->getRepository()->getAssociation($relation)->aliasField($field)
-						))
+						->where($filterExp)
 				));
 		};
 	}
