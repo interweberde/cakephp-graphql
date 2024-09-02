@@ -56,17 +56,23 @@ class CakeORMPaginationResult implements PaginationResult {
 			$limit = min($limit, 100);
 		}
 
+		$count = $this->count();
+
 		$page = (int) ceil((float) $offset / $limit) + 1;
-		try {
-			$results = $paginator->paginate($this->query, [
-				'page' => $page,
-				'limit' => $limit,
-			]);
-		} catch (\Cake\Datasource\Paging\Exception\PageOutOfBoundsException $e) {
-			throw new RecordNotFoundException($e->getMessage());
+		if ($offset < $count) {
+			try {
+				$results = $paginator->paginate($this->query, [
+					'page' => $page,
+					'limit' => $limit,
+				]);
+			} catch (\Cake\Datasource\Paging\Exception\PageOutOfBoundsException $e) {
+				$results = [];
+			}
+		} else {
+			$results = [];
 		}
 
-		return new CakeORMPaginationPage(collection($results), $offset, $page, $limit, $this->count(), $this->mapResult);
+		return new CakeORMPaginationPage(collection($results), $offset, $page, $limit, $count, $this->mapResult);
 	}
 
 	/**
