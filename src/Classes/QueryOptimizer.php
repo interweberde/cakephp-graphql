@@ -317,6 +317,11 @@ class QueryOptimizer {
 				continue;
 			}
 
+			// we get an array of booleans with numeric keys when the same field is requested multiple times
+			if (is_array($value) && !array_filter($value, fn ($key) => !is_numeric($key), ARRAY_FILTER_USE_KEY)) {
+				$value = (bool) in_array(true, $value);
+			}
+
 			yield $field => $value;
 		}
 	}
