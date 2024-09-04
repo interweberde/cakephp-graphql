@@ -34,6 +34,8 @@ class AuthenticationServiceDataHandler extends DataHandler {
 	 * @param Filter|null $filter
 	 * @param Sorter|null $sorter
 	 * @param string $scope
+	 * @param string $finder
+	 * @param mixed ...$finderArgs
 	 * @return CakeORMPaginationResult<E>
 	 */
 	public function fetchEntities(
@@ -42,9 +44,11 @@ class AuthenticationServiceDataHandler extends DataHandler {
 		?UserInterface $user,
 		?Filter $filter = null,
 		?Sorter $sorter = null,
-		string $scope = 'list'
+		string $scope = 'list',
+		string $finder = 'all',
+		mixed ...$finderArgs
 	): CakeORMPaginationResult {
-		$query = $this->model->find();
+		$query = $this->model->find($finder, ...$finderArgs);
 		$query = QueryOptimizer::optimizeQueryWithOptionalUser($query, $resolveInfo, $authorizationService, $user, $scope, true);
 
 		if ($filter) {
@@ -64,6 +68,8 @@ class AuthenticationServiceDataHandler extends DataHandler {
 	 * @param UserInterface|null $user
 	 * @param EntityInterface $entity
 	 * @param string $scope
+	 * @param string $finder
+	 * @param mixed ...$finderArgs
 	 * @return E
 	 * @throws \Exception
 	 */
@@ -72,13 +78,15 @@ class AuthenticationServiceDataHandler extends DataHandler {
 		AuthorizationServiceInterface $authorizationService,
 		?UserInterface $user,
 		EntityInterface $entity,
-		string $scope = 'show'
+		string $scope = 'show',
+		string $finder = 'all',
+		mixed ...$finderArgs
 	) {
 		if ($entity->get('_locale') && $this->model->hasBehavior('Translate')) {
 			$this->model->setLocale($entity->get('_locale'));
 		}
 
-		return $this->fetchEntityByPK($resolveInfo, $authorizationService, $user, $entity->get($this->model->getPrimaryKey()), $scope);
+		return $this->fetchEntityByPK($resolveInfo, $authorizationService, $user, $entity->get($this->model->getPrimaryKey()), $scope, $finder, ...$finderArgs);
 	}
 
 	/**
@@ -87,6 +95,8 @@ class AuthenticationServiceDataHandler extends DataHandler {
 	 * @param UserInterface|null $user
 	 * @param mixed $id
 	 * @param string $scope
+	 * @param string $finder
+	 * @param mixed ...$finderArgs
 	 * @return E
 	 * @throws \Exception
 	 */
@@ -95,7 +105,9 @@ class AuthenticationServiceDataHandler extends DataHandler {
 		AuthorizationServiceInterface $authorizationService,
 		?UserInterface $user,
 		mixed $id,
-		string $scope = 'show'
+		string $scope = 'show',
+		string $finder = 'all',
+		mixed ...$finderArgs
 	) {
 		$pk = $this->model->getPrimaryKey();
 
@@ -103,7 +115,7 @@ class AuthenticationServiceDataHandler extends DataHandler {
 			throw new \Exception('empty or composite pks are unsupported.');
 		}
 
-		return $this->fetchEntityByField($resolveInfo, $authorizationService, $user, $pk, $id, $scope);
+		return $this->fetchEntityByField($resolveInfo, $authorizationService, $user, $pk, $id, $scope, $finder, ...$finderArgs);
 	}
 
 	/**
@@ -113,6 +125,8 @@ class AuthenticationServiceDataHandler extends DataHandler {
 	 * @param string $field
 	 * @param ID|string|int $id
 	 * @param string $scope
+	 * @param string $finder
+	 * @param mixed ...$finderArgs
 	 * @return E
 	 */
 	public function fetchEntityByField(
@@ -121,9 +135,11 @@ class AuthenticationServiceDataHandler extends DataHandler {
 		?UserInterface $user,
 		string $field,
 		ID|string|int $id,
-		string $scope = 'show'
+		string $scope = 'show',
+		string $finder = 'all',
+		mixed ...$finderArgs
 	) {
-		$query = $this->model->find()->where([
+		$query = $this->model->find($finder, ...$finderArgs)->where([
 			$this->model->aliasField($field) => (string) $id,
 		]);
 
@@ -143,6 +159,8 @@ class AuthenticationServiceDataHandler extends DataHandler {
 	 * @param UserInterface|null $user
 	 * @param EntityInterface $entity
 	 * @param string $fetchScope
+	 * @param string $finder
+	 * @param mixed ...$finderArgs
 	 * @return E
 	 * @throws ForbiddenException
 	 */
@@ -151,7 +169,9 @@ class AuthenticationServiceDataHandler extends DataHandler {
 		AuthorizationServiceInterface $authorizationService,
 		?UserInterface $user,
 		EntityInterface $entity,
-		string $fetchScope = 'show'
+		string $fetchScope = 'show',
+		string $finder = 'all',
+		mixed ...$finderArgs
 	) {
 		if (!$authorizationService->can($user, 'create', $entity)) {
 			throw new ForbiddenException();
@@ -159,15 +179,17 @@ class AuthenticationServiceDataHandler extends DataHandler {
 
 		$this->model->saveOrFail($entity);
 
-		return $this->fetchEntity($resolveInfo, $authorizationService, $user, $entity, $fetchScope);
+		return $this->fetchEntity($resolveInfo, $authorizationService, $user, $entity, $fetchScope, $finder, ...$finderArgs);
 	}
 
 	/**
 	 * @param ResolveInfo $resolveInfo
 	 * @param AuthorizationServiceInterface $authorizationService
-	 * @param UserInterface $user
+	 * @param UserInterface|null $user
 	 * @param EntityInterface $entity
 	 * @param string $fetchScope
+	 * @param string $finder
+	 * @param mixed ...$finderArgs
 	 * @return E
 	 * @throws ForbiddenException
 	 */
@@ -176,7 +198,9 @@ class AuthenticationServiceDataHandler extends DataHandler {
 		AuthorizationServiceInterface $authorizationService,
 		?UserInterface $user,
 		EntityInterface $entity,
-		string $fetchScope = 'show'
+		string $fetchScope = 'show',
+		string $finder = 'all',
+		mixed ...$finderArgs
 	) {
 		if (!$authorizationService->can($user, 'update', $entity)) {
 			throw new ForbiddenException();
@@ -184,7 +208,7 @@ class AuthenticationServiceDataHandler extends DataHandler {
 
 		$this->model->saveOrFail($entity);
 
-		return $this->fetchEntity($resolveInfo, $authorizationService, $user, $entity, $fetchScope);
+		return $this->fetchEntity($resolveInfo, $authorizationService, $user, $entity, $fetchScope, $finder, ...$finderArgs);
 	}
 
 	public function deleteEntity(
