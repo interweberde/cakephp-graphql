@@ -33,10 +33,11 @@ class AuthenticationServiceDataHandler extends DataHandler {
 	 * @param UserInterface|null $user
 	 * @param Filter|null $filter
 	 * @param Sorter|null $sorter
-	 * @param string $scope
+	 * @param string|array<string, string> $scope see QueryOptimizer::optimizeQuery() $authorizationScopes
 	 * @param string $finder
 	 * @param mixed ...$finderArgs
 	 * @return CakeORMPaginationResult<E>
+	 * @see QueryOptimizer::optimizeQuery()
 	 */
 	public function fetchEntities(
 		ResolveInfo $resolveInfo,
@@ -44,7 +45,7 @@ class AuthenticationServiceDataHandler extends DataHandler {
 		?UserInterface $user,
 		?Filter $filter = null,
 		?Sorter $sorter = null,
-		string $scope = 'list',
+		string|array $scope = 'list',
 		string $finder = 'all',
 		mixed ...$finderArgs
 	): CakeORMPaginationResult {
@@ -67,7 +68,7 @@ class AuthenticationServiceDataHandler extends DataHandler {
 	 * @param AuthorizationServiceInterface $authorizationService
 	 * @param UserInterface|null $user
 	 * @param EntityInterface $entity
-	 * @param string $scope
+	 * @param string|array<string, string> $scope
 	 * @param string $finder
 	 * @param mixed ...$finderArgs
 	 * @return E
@@ -78,7 +79,7 @@ class AuthenticationServiceDataHandler extends DataHandler {
 		AuthorizationServiceInterface $authorizationService,
 		?UserInterface $user,
 		EntityInterface $entity,
-		string $scope = 'show',
+		string|array $scope = 'show',
 		string $finder = 'all',
 		mixed ...$finderArgs
 	) {
@@ -94,7 +95,7 @@ class AuthenticationServiceDataHandler extends DataHandler {
 	 * @param AuthorizationServiceInterface $authorizationService
 	 * @param UserInterface|null $user
 	 * @param mixed $id
-	 * @param string $scope
+	 * @param string|array<string, string> $scope
 	 * @param string $finder
 	 * @param mixed ...$finderArgs
 	 * @return E
@@ -105,7 +106,7 @@ class AuthenticationServiceDataHandler extends DataHandler {
 		AuthorizationServiceInterface $authorizationService,
 		?UserInterface $user,
 		mixed $id,
-		string $scope = 'show',
+		string|array $scope = 'show',
 		string $finder = 'all',
 		mixed ...$finderArgs
 	) {
@@ -124,7 +125,7 @@ class AuthenticationServiceDataHandler extends DataHandler {
 	 * @param UserInterface|null $user
 	 * @param string $field
 	 * @param ID|string|int $id
-	 * @param string $scope
+	 * @param string|array<string, string> $scope
 	 * @param string $finder
 	 * @param mixed ...$finderArgs
 	 * @return E
@@ -135,7 +136,7 @@ class AuthenticationServiceDataHandler extends DataHandler {
 		?UserInterface $user,
 		string $field,
 		ID|string|int $id,
-		string $scope = 'show',
+		string|array $scope = 'show',
 		string $finder = 'all',
 		mixed ...$finderArgs
 	) {
