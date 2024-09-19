@@ -291,7 +291,7 @@ class QueryOptimizer {
 
 					if ($remapFields === true || $remapFields === $dependencyKey) {
 						$fieldsRemapped = true;
-						$dependencyValue = $value;
+						$dependencyValue = array_merge((array) $dependencyValue, (array) $value);
 					}
 
 					if (is_string($dependencyValue) && $dependencyValue !== '*') {
@@ -340,7 +340,7 @@ class QueryOptimizer {
 
 		foreach ($fields as $field => $value) {
 			if (is_array($value)) {
-				$contain[$field] = $value;
+				$contain[$field] = array_merge_recursive($contain[$field] ?? [], $value);
 				continue;
 			}
 
