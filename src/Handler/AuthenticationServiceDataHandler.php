@@ -22,14 +22,14 @@ use TheCodingMachine\GraphQLite\Types\ID;
 class AuthenticationServiceDataHandler extends DataHandler {
 	/**
 	 * @param class-string<T>|T $model
+	 * @param AuthorizationServiceInterface $authorizationService
 	 */
-	public function __construct($model) {
+	public function __construct($model, protected readonly AuthorizationServiceInterface $authorizationService) {
 		parent::__construct($model);
 	}
 
 	/**
 	 * @param ResolveInfo $resolveInfo
-	 * @param AuthorizationServiceInterface $authorizationService
 	 * @param UserInterface|null $user
 	 * @param Filter|null $filter
 	 * @param Sorter|null $sorter
@@ -41,7 +41,6 @@ class AuthenticationServiceDataHandler extends DataHandler {
 	 */
 	public function fetchEntities(
 		ResolveInfo $resolveInfo,
-		AuthorizationServiceInterface $authorizationService,
 		?UserInterface $user,
 		?Filter $filter = null,
 		?Sorter $sorter = null,
@@ -50,7 +49,7 @@ class AuthenticationServiceDataHandler extends DataHandler {
 		mixed ...$finderArgs
 	): CakeORMPaginationResult {
 		$query = $this->model->find($finder, ...$finderArgs);
-		$query = QueryOptimizer::optimizeQueryWithOptionalUser($query, $resolveInfo, $authorizationService, $user, $scope, true);
+		$query = QueryOptimizer::optimizeQueryWithOptionalUser($query, $resolveInfo, $this->authorizationService, $user, $scope, true);
 
 		if ($filter) {
 			$query = $filter->apply($query);
@@ -76,7 +75,6 @@ class AuthenticationServiceDataHandler extends DataHandler {
 	 */
 	public function fetchEntity(
 		ResolveInfo $resolveInfo,
-		AuthorizationServiceInterface $authorizationService,
 		?UserInterface $user,
 		EntityInterface $entity,
 		string|array $scope = 'show',
@@ -87,12 +85,11 @@ class AuthenticationServiceDataHandler extends DataHandler {
 			$this->model->setLocale($entity->get('_locale'));
 		}
 
-		return $this->fetchEntityByPK($resolveInfo, $authorizationService, $user, $entity->get($this->model->getPrimaryKey()), $scope, $finder, ...$finderArgs);
+		return $this->fetchEntityByPK($resolveInfo, $user, $entity->get($this->model->getPrimaryKey()), $scope, $finder, ...$finderArgs);
 	}
 
 	/**
 	 * @param ResolveInfo $resolveInfo
-	 * @param AuthorizationServiceInterface $authorizationService
 	 * @param UserInterface|null $user
 	 * @param mixed $id
 	 * @param string|array<string, string> $scope
@@ -103,7 +100,6 @@ class AuthenticationServiceDataHandler extends DataHandler {
 	 */
 	public function fetchEntityByPK(
 		ResolveInfo $resolveInfo,
-		AuthorizationServiceInterface $authorizationService,
 		?UserInterface $user,
 		mixed $id,
 		string|array $scope = 'show',
@@ -116,12 +112,11 @@ class AuthenticationServiceDataHandler extends DataHandler {
 			throw new \Exception('empty or composite pks are unsupported.');
 		}
 
-		return $this->fetchEntityByField($resolveInfo, $authorizationService, $user, $pk, $id, $scope, $finder, ...$finderArgs);
+		return $this->fetchEntityByField($resolveInfo, $user, $pk, $id, $scope, $finder, ...$finderArgs);
 	}
 
 	/**
 	 * @param ResolveInfo|null $resolveInfo Note: null is only allowed for internal purposes. Be sure to pass ResolveInfo when using result as GraphQL return.
-	 * @param AuthorizationServiceInterface $authorizationService
 	 * @param UserInterface|null $user
 	 * @param string $field
 	 * @param ID|string|int $id
@@ -132,7 +127,6 @@ class AuthenticationServiceDataHandler extends DataHandler {
 	 */
 	public function fetchEntityByField(
 		?ResolveInfo $resolveInfo,
-		AuthorizationServiceInterface $authorizationService,
 		?UserInterface $user,
 		string $field,
 		ID|string|int $id,
@@ -145,7 +139,7 @@ class AuthenticationServiceDataHandler extends DataHandler {
 		]);
 
 		if ($resolveInfo) {
-			$query = QueryOptimizer::optimizeQueryWithOptionalUser($query, $resolveInfo, $authorizationService, $user, $scope);
+			$query = QueryOptimizer::optimizeQueryWithOptionalUser($query, $resolveInfo, $this->authorizationService, $user, $scope);
 		}
 
 		/** @var E $entity */
@@ -156,7 +150,6 @@ class AuthenticationServiceDataHandler extends DataHandler {
 
 	/**
 	 * @param ResolveInfo $resolveInfo
-	 * @param AuthorizationServiceInterface $authorizationService
 	 * @param UserInterface|null $user
 	 * @param EntityInterface $entity
 	 * @param string $fetchScope
@@ -167,25 +160,23 @@ class AuthenticationServiceDataHandler extends DataHandler {
 	 */
 	public function createEntity(
 		ResolveInfo $resolveInfo,
-		AuthorizationServiceInterface $authorizationService,
 		?UserInterface $user,
 		EntityInterface $entity,
 		string $fetchScope = 'show',
 		string $finder = 'all',
 		mixed ...$finderArgs
 	) {
-		if (!$authorizationService->can($user, 'create', $entity)) {
+		if (!$this->authorizationService->can($user, 'create', $entity)) {
 			throw new ForbiddenException();
 		}
 
 		$this->model->saveOrFail($entity);
 
-		return $this->fetchEntity($resolveInfo, $authorizationService, $user, $entity, $fetchScope, $finder, ...$finderArgs);
+		return $this->fetchEntity($resolveInfo, $user, $entity, $fetchScope, $finder, ...$finderArgs);
 	}
 
 	/**
 	 * @param ResolveInfo $resolveInfo
-	 * @param AuthorizationServiceInterface $authorizationService
 	 * @param UserInterface|null $user
 	 * @param EntityInterface $entity
 	 * @param string $fetchScope
@@ -196,30 +187,28 @@ class AuthenticationServiceDataHandler extends DataHandler {
 	 */
 	public function updateEntity(
 		ResolveInfo $resolveInfo,
-		AuthorizationServiceInterface $authorizationService,
 		?UserInterface $user,
 		EntityInterface $entity,
 		string $fetchScope = 'show',
 		string $finder = 'all',
 		mixed ...$finderArgs
 	) {
-		if (!$authorizationService->can($user, 'update', $entity)) {
+		if (!$this->authorizationService->can($user, 'update', $entity)) {
 			throw new ForbiddenException();
 		}
 
 		$this->model->saveOrFail($entity);
 
-		return $this->fetchEntity($resolveInfo, $authorizationService, $user, $entity, $fetchScope, $finder, ...$finderArgs);
+		return $this->fetchEntity($resolveInfo, $user, $entity, $fetchScope, $finder, ...$finderArgs);
 	}
 
 	public function deleteEntity(
-		AuthorizationServiceInterface $authorizationService,
 		?UserInterface $user,
 		string $field,
 		ID $id
 	): bool {
-		$entity = $this->fetchEntityByField(null, $authorizationService, $user, $field, $id);
-		if (!$authorizationService->can($user, 'delete', $entity)) {
+		$entity = $this->fetchEntityByField(null, $user, $field, $id);
+		if (!$this->authorizationService->can($user, 'delete', $entity)) {
 			throw new ForbiddenException();
 		}
 
