@@ -15,7 +15,9 @@ use Cake\ORM\Query\SelectQuery;
 use Cake\ORM\Table;
 use Cake\Utility\Hash;
 use Cake\Utility\Inflector;
+use GraphQL\Type\Definition\OutputType;
 use GraphQL\Type\Definition\ResolveInfo;
+use GraphQL\Type\Definition\WrappingType;
 use Interweber\GraphQL\Annotation\FieldDependencies;
 use ReflectionClass;
 use TheCodingMachine\GraphQLite\Annotations\MagicField;
@@ -210,6 +212,8 @@ class QueryOptimizer {
 	}
 
 	protected static function _getFieldGetterReflection(\ReflectionClass $entityReflection, string $field): \ReflectionMethod|null {
+		// TODO: in theory we'd need to iterate all methods and their annotations for field name
+		// TODO: it may be a better idea to resolve the field from the entity - especially for relations.
 		$possibleNames = [$field, 'get' . ucfirst($field)];
 
 		/** @var \ReflectionMethod|null $methodReflection */
@@ -225,25 +229,33 @@ class QueryOptimizer {
 		return $methodReflection;
 	}
 
-	protected static function _getFieldDependency(string $entityClass, string $field): FieldDependencies|null {
-		return Cache::remember(static::_escapeCacheKey($entityClass . '::' . $field), function () use ($field, $entityClass) {
-			$entityReflection = new ReflectionClass($entityClass);
-			$methodReflection = static::_getFieldGetterReflection($entityReflection, $field);
-			if (!$methodReflection) {
-				return null;
+	protected static function _getFieldDependency(array $entityClasses, string $field): FieldDependencies|null {
+		foreach ($entityClasses as $entityClass) {
+			$result = Cache::remember(static::_escapeCacheKey($entityClass . '::' . $field), function () use ($field, $entityClass) {
+				$entityReflection = new ReflectionClass($entityClass);
+				$methodReflection = static::_getFieldGetterReflection($entityReflection, $field);
+				if (!$methodReflection) {
+					return null;
+				}
+
+				$dependencyAttribute = $methodReflection->getAttributes(FieldDependencies::class)[0] ?? null;
+
+				if (!$dependencyAttribute) {
+					return null;
+				}
+
+				return new FieldDependencies($dependencyAttribute->getArguments());
+			}, 'graphql');
+
+			if ($result) {
+				return $result;
 			}
+		}
 
-			$dependencyAttribute = $methodReflection->getAttributes(FieldDependencies::class)[0] ?? null;
-
-			if (!$dependencyAttribute) {
-				return null;
-			}
-
-			return new FieldDependencies($dependencyAttribute->getArguments());
-		}, 'graphql');
+		return null;
 	}
 
-	protected static function _generateFields(array $_fields, \Cake\ORM\Table $Model) {
+	protected static function _generateFields(array $_fields, \Cake\ORM\Table $Model, array $lookupTypes) {
 		$forceFields = $Model->forceFields ?? [];
 		foreach ($forceFields as $forceField) {
 			if ($_fields[$forceField] ?? false) {
@@ -269,7 +281,7 @@ class QueryOptimizer {
 
 			$fieldsRemapped = false;
 
-			$dependency = static::_getFieldDependency($Model->getEntityClass(), $field);
+			$dependency = static::_getFieldDependency($lookupTypes, $field);
 			if ($dependency) {
 				$remapFields = $dependency->getRemapFields();
 				$dependencies = $dependency->getDependencies();
@@ -326,7 +338,7 @@ class QueryOptimizer {
 		}
 	}
 
-	protected static function _getModelFieldsAndContain(array $_fields, \Cake\ORM\Table $Model, bool $pagination) {
+	protected static function _getModelFieldsAndContain(array $_fields, \Cake\ORM\Table $Model, array $lookupTypes, bool $pagination) {
 		$select = [
 			'id',
 		];
@@ -336,7 +348,7 @@ class QueryOptimizer {
 			$_fields = $_fields['items'] ?? $_fields;
 		}
 
-		$fields = static::_generateFields($_fields, $Model);
+		$fields = static::_generateFields($_fields, $Model, $lookupTypes);
 
 		foreach ($fields as $field => $value) {
 			if (is_array($value)) {
@@ -459,6 +471,44 @@ class QueryOptimizer {
 	}
 
 	/**
+	 * @param OutputType $outputType
+	 * @return class-string|null
+	 * @throws \ReflectionException
+	 */
+	protected static function getLookupClass(OutputType $outputType): ?string {
+			if ($outputType instanceof WrappingType) {
+				$outputType = $outputType->getInnermostType();
+			}
+
+			if (
+				str_starts_with($outputType->name(), 'Porpaginas')
+				&& ($outputType->config['fields'] ?? null) instanceof \Closure
+			) {
+				$reflect = new \ReflectionFunction($outputType->config['fields']);
+
+				$subType = $reflect->getStaticVariables()['subType'] ?? null;
+
+				if (!$subType instanceof WrappingType) {
+					return null;
+				}
+
+				$outputType = $subType->getInnermostType();
+			}
+
+			if (($outputType->config['fields'] ?? null) instanceof \Closure) {
+				$reflect = new \ReflectionFunction($outputType->config['fields']);
+
+				$annotated = $reflect->getStaticVariables()['annotatedObject'] ?? null;
+
+				if (is_object($annotated)) {
+					return $annotated::class;
+				}
+			}
+
+			return null;
+	}
+
+	/**
 	 * @param ResolveInfo $info
 	 * @param Table $Model
 	 * @param bool $pagination
@@ -467,20 +517,26 @@ class QueryOptimizer {
 	 * @throws \RuntimeException
 	 */
 	protected static function _getModelFieldsAndContainCached(ResolveInfo|array $info, Table $Model, bool $pagination, SelectQuery $query): array {
+		$lookupTypes = [$Model::class];
+
 		if ($info instanceof ResolveInfo) {
 			$_fields = $info->getFieldSelection(6);
+
+			$lookupTypes[] = static::getLookupClass($info->returnType);
 		} else {
 			$_fields = $info;
 		}
 
+		$lookupTypes = array_unique(array_filter($lookupTypes));
+
 		$key = 'cake-query-fields-' . static::_escapeCacheKey($Model->getEntityClass()) . '-' . hash('xxh128', serialize($_fields));
-		['select' => $select, 'contain' => $contain] = Cache::remember($key, fn() => static::_getModelFieldsAndContain($_fields, $Model, $pagination), 'graphql');
+		['select' => $select, 'contain' => $contain] = Cache::remember($key, fn() => static::_getModelFieldsAndContain($_fields, $Model, $lookupTypes, $pagination), 'graphql');
 
 		try {
 			$select = static::_applyVirtualFields($select, $Model, $query);
 		} catch (\RuntimeException $e) {
 			// A virtual field could not be resolved. Try again without cache...
-			static::_getModelFieldsAndContain($_fields, $Model, $pagination);
+			static::_getModelFieldsAndContain($_fields, $Model, $lookupTypes, $pagination);
 			$select = static::_applyVirtualFields($select, $Model, $query);
 		}
 
@@ -560,7 +616,8 @@ class QueryOptimizer {
 	protected static function getContainKeys(\Cake\ORM\Table $Model, array $items, string $key = ''): array {
 		$result = [];
 
-		$fields = static::_generateFields($items, $Model);
+		// TODO: implement lookupTypes so that the mapped type of the contained model is used.
+		$fields = static::_generateFields($items, $Model, [$Model->getEntityClass()]);
 
 		foreach ($fields as $itemKey => $item) {
 			if ($itemKey == '__typename') {
