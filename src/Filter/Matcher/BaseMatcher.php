@@ -33,8 +33,12 @@ abstract class BaseMatcher extends Matcher {
 			$expr = $expr->notEq($field, $this->neq);
 		}
 
-		if ($this->in) {
-			$expr = $expr->in($field, $this->in);
+		if ($this->in !== null) {
+			if (!$this->in) {
+				$expr = $expr->add('1 = 0');
+			} else {
+				$expr = $expr->in($field, $this->in);
+			}
 		}
 
 		if ($this->nin) {
