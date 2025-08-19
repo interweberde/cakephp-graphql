@@ -3,12 +3,16 @@ declare(strict_types=1);
 
 namespace Interweber\GraphQL\Exception;
 
-use TheCodingMachine\GraphQLite\Exceptions\GraphQLException;
+use GraphQL\Error\Error;
 
-class ForbiddenException extends GraphQLException {
-	public function __construct(string $message = 'Forbidden', int $code = 403) {
-		parent::__construct($message, $code, null, [
-			'category' => 'authorization'
-		]);
+class ForbiddenException extends Error {
+	public function __construct(string $message = 'Forbidden', ?\Cake\Http\Exception\ForbiddenException $previous = null) {
+		parent::__construct(
+			message: $message,
+			previous: $previous,
+			extensions: [
+				'category' => 'authorization',
+			]
+		);
 	}
 }

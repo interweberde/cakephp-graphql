@@ -4,11 +4,15 @@ declare(strict_types=1);
 namespace Interweber\GraphQL\Controller;
 
 use Authentication\Controller\Component\AuthenticationComponent;
+use Authorization\AuthorizationServiceInterface;
 use Authorization\Controller\Component\AuthorizationComponent;
 use Cake\Controller\Controller;
 use Cake\Core\Configure;
 use Cake\Datasource\Exception\RecordNotFoundException;
 use Cake\Event\Event;
+use Cake\Http\Exception\ForbiddenException;
+use Cake\Http\Response;
+use Cake\Http\ResponseFactory;
 use Cake\ORM\Exception\PersistenceFailedException;
 use Cake\View\JsonView;
 use GraphQL\Error\DebugFlag;
@@ -49,7 +53,9 @@ class GraphqlController extends Controller {
 		$this->loadComponent('Authentication.Authentication');
 		$this->loadComponent('Authorization.Authorization');
 
-		$this->Authentication->allowUnauthenticated(['handle']);
+		if (Configure::read('GraphQL.allow_unauthenticated', false)) {
+			$this->Authentication->allowUnauthenticated(['handle']);
+		}
 
 		/**
 		 * @param Error[] $errors
@@ -84,14 +90,18 @@ class GraphqlController extends Controller {
 							$error->getSource(),
 							$error->getPositions(),
 							$error->path,
-							null,
+							$prev,
 							$error->getExtensions()
 						);
 					} else {
-						$err = new \Interweber\GraphQL\Exception\RecordNotFoundException();
+						$err = new \Interweber\GraphQL\Exception\RecordNotFoundException(previous: $prev);
 					}
 
 					return $err;
+				}
+
+				if ($prev instanceof ForbiddenException) {
+					return new \Interweber\GraphQL\Exception\ForbiddenException($prev->getMessage(), $prev);
 				}
 
 				return $error;
@@ -100,7 +110,10 @@ class GraphqlController extends Controller {
 			return WebonyxErrorHandler::errorHandler($errors, $formatter);
 		};
 
-		$schemaFactory = SchemaGenerator::getSchemaFactory();
+		$container = SchemaGenerator::makeContainer();
+		$container->set(AuthorizationServiceInterface::class, $this->request->getAttribute('authorization'));
+
+		$schemaFactory = SchemaGenerator::getSchemaFactory($container);
 
 		$schemaFactory
 			->setAuthenticationService(new AuthenticationService($this->request))
@@ -133,6 +146,8 @@ class GraphqlController extends Controller {
 		$builder
 			->setUrl('/__graphql');
 
+		$builder->setResponseFactory(new ResponseFactory());
+
 		$this->getEventManager()->dispatch(new Event('onCreateGraphQlBuilder', $this, ['builder' => $builder]));
 
 		$this->graphqlMiddleware = $builder->createMiddleware();
@@ -156,14 +171,9 @@ class GraphqlController extends Controller {
 		$request->getBody()->rewind();
 
 		$handler = new StaticRequestHandler($this->getResponse());
-		$graphqlResponse = $this->graphqlMiddleware->process($request, $handler);
+		$response = $this->graphqlMiddleware->process($request, $handler);
 
-		// cake requires us to return a Cake Response.
-		// so we have to transfer every attribute over to one.
-		$response = $this->getResponse()
-			->withStatus($graphqlResponse->getStatusCode(), $graphqlResponse->getReasonPhrase())
-			->withBody($graphqlResponse->getBody())
-			->withProtocolVersion($graphqlResponse->getProtocolVersion());
+		assert($response instanceof Response);
 
 		if (
 			$response->getStatusCode() === 400
@@ -175,10 +185,6 @@ class GraphqlController extends Controller {
 			// https://github.com/APIs-guru/graphql-over-http
 
 			$response = $response->withStatus(200);
-		}
-
-		foreach ($graphqlResponse->getHeaders() as $key => $value) {
-			$response = $response->withHeader($key, $value);
 		}
 
 		return $response;

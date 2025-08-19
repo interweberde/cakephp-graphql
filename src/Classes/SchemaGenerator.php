@@ -16,9 +16,7 @@ use Kcs\ClassFinder\Finder\FinderInterface;
 use TheCodingMachine\GraphQLite\SchemaFactory;
 
 class SchemaGenerator {
-	public static function getSchemaFactory(): SchemaFactory {
-		$cache = Cache::pool('graphql');
-
+	public static function makeContainer(): \DI\Container {
 		$builder = new \DI\ContainerBuilder();
 		if (!Configure::read('debug')) {
 			$builder->addDefinitions(TMP . 'di-classes.php');
@@ -28,7 +26,11 @@ class SchemaGenerator {
 			}
 		}
 
-		$container = $builder->build();
+		return $builder->build();
+	}
+
+	public static function getSchemaFactory(\Psr\Container\ContainerInterface $container): SchemaFactory {
+		$cache = Cache::pool('graphql');
 
 		$pluginPath = Plugin::classPath('Interweber/GraphQL');
 		$path = str_replace(ROOT . DS, '', $pluginPath);
@@ -52,9 +54,9 @@ class SchemaGenerator {
 		$factory = new SchemaFactory($cache, $container);
 		$factory->setFinder($classNameMapper);
 		$factory
-			->addControllerNamespace(Configure::read('App.namespace') . '\\GraphQL\\Controller')
-			->addTypeNamespace(Configure::read('App.namespace'))
-			->addTypeNamespace('Interweber\\GraphQL')
+			->addNamespace(Configure::read('App.namespace') . '\\GraphQL\\Controller')
+			->addNamespace(Configure::read('App.namespace'))
+			->addNamespace('Interweber\\GraphQL')
 			->addRootTypeMapperFactory(new DateTypeMapperFactory())
 			->addRootTypeMapperFactory(new SubscriptionTypeMapperFactory());
 

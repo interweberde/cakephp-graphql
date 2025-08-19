@@ -36,7 +36,9 @@ class BaseController {
 	 */
 	protected AuthenticationServiceDataHandler $dataHandler;
 
-	public function __construct() {
+	public function __construct(
+		\Authorization\AuthorizationServiceInterface $authorizationService
+	) {
 		if (empty($this->modelName)) {
 			[, $name] = namespaceSplit(static::class);
 			$this->modelName = substr($name, 0, -10);
@@ -47,10 +49,9 @@ class BaseController {
 		$table = $this->getTableLocator()->get($modelClass);
 		$this->model = $table;
 
-		$this->initialize();
+		$this->dataHandler = new AuthenticationServiceDataHandler($this->model, $authorizationService);
 	}
 
 	public function initialize(): void {
-		$this->dataHandler = new AuthenticationServiceDataHandler($this->model);
 	}
 }

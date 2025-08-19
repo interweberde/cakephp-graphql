@@ -3,11 +3,14 @@ declare(strict_types=1);
 
 namespace Interweber\GraphQL\Command;
 
+use Authorization\AuthorizationServiceInterface;
 use Cake\Command\Command;
 use Cake\Console\Arguments;
 use Cake\Console\ConsoleIo;
 use Cake\Console\ConsoleOptionParser;
+use Cake\Event\Event;
 use GraphQL\Utils\SchemaPrinter;
+use Interweber\GraphQL\Classes\MockAuthorizationService;
 use Interweber\GraphQL\Classes\SchemaGenerator;
 
 /**
@@ -38,7 +41,14 @@ class PrintSchemaCommand extends Command {
 	 * @return null|void|int The exit code or null for success
 	 */
 	public function execute(Arguments $args, ConsoleIo $io) {
-		$schema = SchemaPrinter::doPrint(SchemaGenerator::getSchemaFactory()->createSchema());
+		$container = SchemaGenerator::makeContainer();
+		$container->set(AuthorizationServiceInterface::class, new MockAuthorizationService());
+
+		$schemaFactory = SchemaGenerator::getSchemaFactory($container);
+
+		$this->getEventManager()->dispatch(new Event('beforeCreateGraphQlSchema', $this, ['factory' => $schemaFactory]));
+
+		$schema = SchemaPrinter::doPrint($schemaFactory->createSchema());
 
 		$io->createFile($args->getArgument('file') ?: 'schema.graphql', $schema);
 	}

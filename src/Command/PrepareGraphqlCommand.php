@@ -14,10 +14,11 @@ use Cake\Console\ConsoleIo;
 use Cake\Console\ConsoleOptionParser;
 use Cake\Core\Configure;
 use Cake\Core\Plugin;
+use Cake\Event\Event;
+use Cake\Event\EventManager;
 use Kcs\ClassFinder\Finder\ComposerFinder;
+use Kcs\ClassFinder\Finder\FinderInterface;
 use ReflectionMethod;
-use TheCodingMachine\GraphQLite\Mappers\GlobTypeMapper;
-use TheCodingMachine\GraphQLite\Utils\Namespaces\NS;
 use function DI\autowire;
 
 /**
@@ -43,47 +44,50 @@ class PrepareGraphqlCommand extends Command {
 		$pluginPath = Plugin::classPath('Interweber/GraphQL');
 		$path = str_replace(ROOT . DS, '', $pluginPath);
 
-		$classNameMapper = new ComposerFinder();
-		$classNameMapper
-			->notInNamespace('App\\Test\\');
+		$result = EventManager::instance()->dispatch(
+			new Event('getGraphQlClassNameMapper', null)
+		)->getResult();
 
-		$namspaces = [
-			Configure::read('App.namespace'),
-			'Interweber\\GraphQL',
-		];
+		if ($result) {
+			if (!$result instanceof FinderInterface) {
+				throw new \InvalidArgumentException('Event must return FinderInterface instance or null');
+			}
+
+			$classNameMapper = $result;
+		} else {
+			$classNameMapper = new ComposerFinder();
+			$classNameMapper
+				->notInNamespace('App\\Test\\');
+		}
 
 		$content = '';
-		foreach ($namspaces as $namespace) {
-			$namespace = new NS($namespace, $cache, $classNameMapper, null, true);
+		foreach ($classNameMapper as $class) {
+			if (!$class->isInstantiable()) {
+				continue;
+			}
 
-			foreach ($namespace->getClassList() as $class) {
-				if (!$class->isInstantiable()) {
+			if (!$class->getAttributes()) {
+				if (!array_filter($class->getMethods(), fn (\ReflectionMethod $method) => $method->getAttributes())) {
 					continue;
 				}
+			}
 
-				if (!$class->getAttributes()) {
-					if (!array_filter($class->getMethods(), fn (\ReflectionMethod $method) => $method->getAttributes())) {
-						continue;
-					}
-				}
+			try {
+				$builder = new \DI\ContainerBuilder();
+				$builder->enableCompilation(TMP, 'TmpContainerCompile');
+				$builder->addDefinitions([
+					$class->name => autowire(),
+				]);
+				$container = $builder->build();
 
-				try {
-					$builder = new \DI\ContainerBuilder();
-					$builder->enableCompilation(TMP, 'TmpContainerCompile');
-					$builder->addDefinitions([
-						$class->name => autowire(),
-					]);
-					$container = $builder->build();
+				$inst = $container->get($class->name);
 
-					$inst = $container->get($class->name);
+				unlink(TMP . 'TmpContainerCompile.php');
 
-					unlink(TMP . 'TmpContainerCompile.php');
-
-					$name = $class->name;
-					$name = str_replace('\\', '\\\\', $name);
-					$content .= "'$name' => autowire(),\n";
-				} catch (\Throwable $t) {
-				}
+				$name = $class->name;
+				$name = str_replace('\\', '\\\\', $name);
+				$content .= "'$name' => autowire(),\n";
+			} catch (\Throwable $t) {
 			}
 		}
 
